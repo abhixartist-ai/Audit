@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Copy VBA Code</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #3AAFA9, #2B7A78);
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+    h1 {
+      margin-bottom: 20px;
+    }
+    button {
+      background: #17252A;
+      color: white;
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      transition: 0.3s;
+    }
+    button:hover {
+      background: #3AAFA9;
+      color: black;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Copy VBA Code</h1>
+  <button onclick="copyCode()">📋 Copy Code</button>
+
+  <script>
+    async function copyCode() {
+      try {
+        const response = await fetch('vba_code.txt'); // External file fetch
+        if (!response.ok) throw new Error('File not found');
+        const code = await response.text();
+        await navigator.clipboard.writeText(code);
+        alert("✅ VBA code copied to clipboard!");
+      } catch (err) {
+        alert("❌ Copy failed: " + err);
+      }
+    }
+  </script>
+
+</body>
+</html>
