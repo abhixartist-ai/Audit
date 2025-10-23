@@ -1,58 +1,66 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Copy VBA Code</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: linear-gradient(135deg, #3AAFA9, #2B7A78);
-      color: white;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      margin: 0;
-    }
-    h1 {
-      margin-bottom: 20px;
-    }
-    button {
-      background: #17252A;
-      color: white;
-      padding: 12px 24px;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 16px;
-      transition: 0.3s;
-    }
-    button:hover {
-      background: #3AAFA9;
-      color: black;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Copy VBA Codes</title>
+<style>
+body { 
+  font-family: Arial, sans-serif; 
+  display: flex; 
+  flex-direction: column; 
+  align-items: center; 
+  justify-content: center; 
+  height: 100vh; 
+  background: linear-gradient(135deg, #3AAFA9, #2B7A78); 
+  color: white;
+  margin:0;
+}
+h1 { margin-bottom: 20px; }
+button { 
+  margin: 5px; 
+  padding: 10px 20px; 
+  border: none; 
+  border-radius: 5px; 
+  cursor: pointer; 
+  background: #17252A; 
+  color: white; 
+  font-size: 16px;
+}
+button:hover { 
+  background: #3AAFA9; 
+  color: black; 
+}
+</style>
 </head>
 <body>
 
-  <h1>Copy VBA Code</h1>
-  <button onclick="copyCode()">📋 Copy Code</button>
+<h1>Copy VBA Code</h1>
 
-  <script>
-    async function copyCode() {
-      try {
-        const response = await fetch('vba_code.txt'); // External file fetch
-        if (!response.ok) throw new Error('File not found');
-        const code = await response.text();
-        await navigator.clipboard.writeText(code);
-        alert("✅ VBA code copied to clipboard!");
-      } catch (err) {
-        alert("❌ Copy failed: " + err);
-      }
-    }
-  </script>
+<button onclick="copyCode('code1.txt')">Copy Code 1</button>
+<button onclick="copyCode('code2.txt')">Copy Code 2</button>
+<button onclick="copyCode('code3.txt')">Copy Code 3</button>
+<button onclick="copyCode('code4.txt')">Copy Code 4</button>
+<button onclick="copyCode('code5.txt')">Copy Code 5</button>
+<button onclick="copyCode('code6.txt')">Copy Code 6</button>
+<button onclick="copyCode('code7.txt')">Copy Code 7</button>
+<button onclick="copyCode('code8.txt')">Copy Code 8</button>
+<button onclick="copyCode('code9.txt')">Copy Code 9</button>
+<button onclick="copyCode('code10.txt')">Copy Code 10</button>
+
+<script>
+async function copyCode(filename) {
+  try {
+    const res = await fetch(filename);
+    if(!res.ok) throw new Error('File not found');
+    const code = await res.text();
+    await navigator.clipboard.writeText(code);
+    alert('✅ ' + filename + ' copied to clipboard!');
+  } catch(err) {
+    alert('❌ Copy failed: ' + err);
+  }
+}
+</script>
 
 </body>
 </html>
