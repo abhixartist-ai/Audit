@@ -1,0 +1,3 @@
+Sub HelloWorld1()
+    MsgBox "Toyota Sale entry Creation"
+End Sub
