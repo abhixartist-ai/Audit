@@ -1,0 +1,3 @@
+Sub M_Sale()
+    MsgBox "M Company - Sale Report"
+End Sub
