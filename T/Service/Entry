@@ -1,3 +1,65 @@
-Sub HelloWorld1()
-    MsgBox "Hello from Code 2"
+Private Sub Worksheet_Change(ByVal Target As Range)
+    If Target.CountLarge > 1 Then Exit Sub
+    Application.EnableEvents = False
+    
+    ' --- Case 1: If entry in Column R or S ---
+    If Not Intersect(Target, Me.Range("R:S")) Is Nothing Then
+        With Me.Rows(Target.Row)
+            .Cells(1, "W").Value = Target.Value
+            .Cells(1, "U").Value = "Tax Invoice"
+            .Cells(1, "Z").Value = "Abhishek Patidar"
+            If .Cells(1, "AA").Value = "" Then
+                .Cells(1, "AA").Value = Date
+            End If
+        End With
+    End If
+    
+    ' --- Case 2: If entry in Column W, X, or Y ---
+    If Not Intersect(Target, Me.Range("W:Y")) Is Nothing Then
+        Select Case UCase(Target.Value)
+            Case "T"
+                Target.Value = "Tax invoice Not Attested"
+            Case "R"
+                Target.Value = "Ro Closed By Zero"
+            Case "J"
+                Target.Value = "Job Description Sheet Not Attested"
+        End Select
+        
+        If Target.Value <> "" Then
+            Me.Cells(Target.Row, "Z").Value = "Abhishek Patidar"
+            If Me.Cells(Target.Row, "AA").Value = "" Then
+                Me.Cells(Target.Row, "AA").Value = Date
+            End If
+        End If
+    End If
+    
+    ' --- Case 3: If entry in Column Z = "a" ---
+    If Not Intersect(Target, Me.Range("Z:Z")) Is Nothing Then
+        If LCase(Target.Value) = "a" Then
+            Me.Cells(Target.Row, "Z").Value = "Abhishek Patidar"
+            If Me.Cells(Target.Row, "AA").Value = "" Then
+                Me.Cells(Target.Row, "AA").Value = Date
+            End If
+        End If
+    End If
+    
+    ' --- Restriction Check ---
+    If Not Intersect(Target, Me.Range("R:R")) Is Nothing Then
+        If Me.Cells(Target.Row, "R").Value <> "" Then
+            If Me.Cells(Target.Row, "T").Value = "" Or Me.Cells(Target.Row, "V").Value = "" Then
+                MsgBox "⚠️ Row " & Target.Row & ": Column T (Qty) aur V (Value) bharna zaroori hai.", vbExclamation
+            End If
+        End If
+    End If
+    
+    If Not Intersect(Target, Me.Range("S:S")) Is Nothing Then
+        If Me.Cells(Target.Row, "S").Value <> "" And Me.Cells(Target.Row, "V").Value = "" Then
+            MsgBox "⚠️ Row " & Target.Row & ": Column V (Value) bharna zaroori hai.", vbExclamation
+        End If
+    End If
+    
+    ' --- AutoFit Entire Sheet ---
+    Me.Cells.EntireColumn.AutoFit
+    
+    Application.EnableEvents = True
 End Sub
