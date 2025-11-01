@@ -1,3 +1,65 @@
-Sub HelloWorld1()
-    MsgBox "Mahindra Sale Sheet Cration"
+Private Sub Worksheet_Change(ByVal Target As Range)
+    Dim todayDate As String
+    todayDate = Format(Date, "dd/mm/yyyy")
+    
+    If Target.CountLarge > 1 Then Exit Sub 'Multiple cells ignore
+    
+    Application.EnableEvents = False
+    
+    ' --- Auto Calculations ---
+    If Target.Column = 6 Or Target.Column = 7 Then
+        Me.Cells(Target.Row, "H").Value = Me.Cells(Target.Row, "F").Value - Me.Cells(Target.Row, "G").Value
+    ElseIf Target.Column = 9 Or Target.Column = 10 Then
+        Me.Cells(Target.Row, "K").Value = Me.Cells(Target.Row, "J").Value - Me.Cells(Target.Row, "I").Value
+    ElseIf Target.Column = 13 Or Target.Column = 14 Then
+        Me.Cells(Target.Row, "O").Value = Me.Cells(Target.Row, "M").Value - Me.Cells(Target.Row, "N").Value
+    ElseIf Target.Column = 16 Or Target.Column = 17 Then
+        Me.Cells(Target.Row, "R").Value = Me.Cells(Target.Row, "P").Value - Me.Cells(Target.Row, "Q").Value
+    End If
+    
+    ' --- Yes/No Replacement (T: X = 20 to 24) ---
+    If Target.Column >= 20 And Target.Column <= 24 Then
+        Select Case LCase(Target.Value)
+            Case "y": Target.Value = "Yes"
+            Case "n": Target.Value = "No"
+        End Select
+    End If
+    
+    ' --- AB Column (MD Sir) ---
+    If Target.Column = 28 Then
+        If LCase(Target.Value) = "m" Then Target.Value = "MD Sir"
+    End If
+    
+    ' --- AC, AD, AE Column Codes (29-31) ---
+    If Target.Column >= 29 And Target.Column <= 31 Then
+        Select Case LCase(Target.Value)
+            Case "r": Target.Value = "RTO Process format not attached"
+            Case "s": Target.Value = "Screen Shot Approval not attached"
+            Case "f": Target.Value = "Finance Sanction latter not attached"
+            Case "o": Target.Value = "OK"
+            Case "c": Target.Value = "Consent Form not attached"
+            Case "u": Target.Value = "Undertaking Form not attached"
+            Case "d": Target.Value = "Discount Approval Sheet not attached"
+        End Select
+        ' --- If AC/AD/AE has something then AF,AG fill ---
+        If Target.Value <> "" Then
+            Me.Cells(Target.Row, "AF").Value = "Abhishek Patidar"
+            Me.Cells(Target.Row, "AG").Value = todayDate
+        End If
+    End If
+    
+    ' --- AF Column (Abhishek Patidar if "a") ---
+    If Target.Column = 32 Then
+        If LCase(Target.Value) = "a" Then
+            Me.Cells(Target.Row, "AF").Value = "Abhishek Patidar"
+            Me.Cells(Target.Row, "AG").Value = todayDate
+        End If
+    End If
+    
+    ' --- Autofit only AC:AG ---
+    If Target.Column >= 29 And Target.Column <= 33 Then
+        Me.Range("AC:AG").EntireColumn.AutoFit
+    End If
+    
+    Application.EnableEvents = True
 End Sub
