@@ -1,2 +1,313 @@
-# Audit
-Audit vba codes
+Option Explicit
+
+Sub CreateSummaryFromPartsAndLab()
+    Dim wb As Workbook
+    Set wb = ThisWorkbook
+    
+    Dim shtParts As Worksheet, shtLab As Worksheet, shtOut As Worksheet
+    On Error Resume Next
+    Set shtParts = wb.Worksheets("Parts")
+    Set shtLab = wb.Worksheets("Lab")
+    On Error GoTo 0
+    If shtParts Is Nothing Or shtLab Is Nothing Then
+        MsgBox "Workbook must contain sheets named 'Parts' and 'Lab'.", vbExclamation
+        Exit Sub
+    End If
+    
+    ' Create or clear Summary sheet
+    On Error Resume Next
+    Set shtOut = wb.Worksheets("Service Vouching")
+    On Error GoTo 0
+    If shtOut Is Nothing Then
+        Set shtOut = wb.Worksheets.Add(After:=wb.Worksheets(wb.Worksheets.Count))
+        shtOut.Name = "Service Vouching"
+    Else
+        Application.DisplayAlerts = False
+        shtOut.Cells.Clear
+        Application.DisplayAlerts = True
+    End If
+    
+    Application.ScreenUpdating = False
+    Application.EnableEvents = False
+    
+    ' --- Setup headings row (row 2 A2:Y2) ---
+    Dim headings As Variant
+    headings = Array( _
+        "Date", "Particulars", "Chassis no.", "Voucher no.", "Rg No.", "RO No.", "RO Status", "Advisor Name.", "Quantity", "Rate", "Value", "Gross Total", "DMS value", "Value Difference", "Active AMC", "Part skipped", "Labour skipped", "Qty skipped", "Skipped juncture", "Skipped value", "Observation 1", "Observation 2", "Observation 3", "Auditor", "Vouching Date" _
+    )
+    Dim c As Long
+    For c = 1 To 25 ' A to Y = 25 columns
+        shtOut.Cells(2, c).Value = headings(c - 1)
+    Next c
+    With shtOut.Range("A2:Y2")
+        .HorizontalAlignment = xlCenter
+        .VerticalAlignment = xlCenter
+        .Font.Bold = True
+        .Font.Size = 12
+        .RowHeight = 30
+    End With
+    ' Fills: E2:H2 blue, O2 orange, P2:Y2 green
+    shtOut.Range("E2:H2").Interior.Color = RGB(0, 176, 240)
+    shtOut.Range("O2:O2").Interior.Color = RGB(255, 192, 0)
+    shtOut.Range("P2:Y2").Interior.Color = RGB(0, 176, 80)
+    
+    ' T1 red fill
+    shtOut.Range("T1").Interior.Color = vbRed
+    
+    ' Dictionaries to collect voucher groups
+    Dim dict As Object
+    Set dict = CreateObject("Scripting.Dictionary") ' key = voucher, value = collection of entries
+    
+    Dim tmpColl As Collection
+    Dim key As String
+    
+    ' --- Scan Parts sheet ---
+    Dim lastP As Long, r As Long
+    lastP = shtParts.Cells(shtParts.Rows.Count, "E").End(xlUp).Row
+    If lastP < 2 Then lastP = 2
+    For r = 2 To lastP ' ignore row 1 as requested
+        ' AD=0 ignore except if W="FUEL"
+        If Not (Trim(CStr(shtParts.Cells(r, "AD").Value)) = "0" And _
+                UCase(Trim(CStr(shtParts.Cells(r, "W").Value))) <> "FUEL") Then
+            key = Trim(CStr(shtParts.Cells(r, "E").Value)) ' voucher no in Parts col E
+            If Len(key) > 0 Then
+                If Not dict.Exists(key) Then
+                    Set tmpColl = New Collection
+                    dict.Add key, tmpColl
+                Else
+                    Set tmpColl = dict(key)
+                End If
+                tmpColl.Add Array("Parts", r)
+            End If
+        End If
+    Next r
+    
+    ' --- Scan Lab sheet ---
+    Dim lastL As Long
+    lastL = shtLab.Cells(shtLab.Rows.Count, "F").End(xlUp).Row
+    If lastL < 2 Then lastL = 2
+    For r = 2 To lastL ' ignore row1
+        key = Trim(CStr(shtLab.Cells(r, "F").Value)) ' voucher no in Lab col F
+        If Len(key) > 0 Then
+            If Not dict.Exists(key) Then
+                Set tmpColl = New Collection
+                dict.Add key, tmpColl
+            Else
+                Set tmpColl = dict(key)
+            End If
+            tmpColl.Add Array("Lab", r)
+        End If
+    Next r
+    
+    If dict.Count = 0 Then
+        MsgBox "No voucher numbers found in Parts (col E) or Lab (col F).", vbInformation
+        GoTo CleanUp
+    End If
+    
+    ' --- Sort vouchers ascending ---
+    Dim vouchers() As String
+    ReDim vouchers(0 To dict.Count - 1)
+    Dim i As Long
+    i = 0
+    Dim k As Variant
+    For Each k In dict.Keys
+        vouchers(i) = CStr(k)
+        i = i + 1
+    Next k
+    Call QuickSortString(vouchers, LBound(vouchers), UBound(vouchers))
+    
+    ' --- Write output ---
+    Dim outRow As Long
+    outRow = 3 ' summary starts at row 3
+    Dim v As Variant
+    For i = LBound(vouchers) To UBound(vouchers)
+        v = vouchers(i)
+        Set tmpColl = dict(v)
+        
+        ' find primary row for summary
+        Dim srcSheetName As String, srcRow As Long
+        srcSheetName = ""
+        srcRow = 0
+        Dim entry As Variant
+        For Each entry In tmpColl
+            If entry(0) = "Parts" Then
+                srcSheetName = "Parts"
+                srcRow = entry(1)
+                Exit For
+            End If
+        Next entry
+        If srcRow = 0 Then
+            entry = tmpColl(1)
+            srcSheetName = entry(0)
+            srcRow = entry(1)
+        End If
+        
+        Dim valA As Variant, valB As Variant, valC As Variant, valD As Variant
+        Dim valE As Variant, valF As Variant, valG As Variant, valH As Variant
+        
+        If srcSheetName = "Parts" Then
+            With shtParts
+                valA = .Cells(srcRow, ColLetterToNumber("G")).Value
+                valB = .Cells(srcRow, ColLetterToNumber("P")).Value
+                valC = .Cells(srcRow, ColLetterToNumber("AS")).Value
+                valD = .Cells(srcRow, ColLetterToNumber("E")).Value
+                valE = .Cells(srcRow, ColLetterToNumber("K")).Value
+                valF = .Cells(srcRow, ColLetterToNumber("D")).Value
+                valG = .Cells(srcRow, ColLetterToNumber("L")).Value
+                valH = ""
+            End With
+        Else
+            With shtLab
+                valA = .Cells(srcRow, ColLetterToNumber("H")).Value
+                valB = .Cells(srcRow, ColLetterToNumber("P")).Value
+                valC = .Cells(srcRow, ColLetterToNumber("AT")).Value
+                valD = .Cells(srcRow, ColLetterToNumber("F")).Value
+                valE = .Cells(srcRow, ColLetterToNumber("L")).Value
+                valF = .Cells(srcRow, ColLetterToNumber("E")).Value
+                valG = .Cells(srcRow, ColLetterToNumber("M")).Value
+                valH = .Cells(srcRow, ColLetterToNumber("AS")).Value
+            End With
+        End If
+        
+        With shtOut
+            .Cells(outRow, "A").Value = valA
+            .Cells(outRow, "B").Value = valB
+            .Cells(outRow, "C").Value = valC
+            .Cells(outRow, "D").Value = valD
+            .Cells(outRow, "E").Value = valE
+            .Cells(outRow, "F").Value = valF
+            .Cells(outRow, "G").Value = valG
+            .Cells(outRow, "H").Value = valH
+            .Cells(outRow, "B").Font.Bold = True
+            .Cells(outRow, "C").Font.Bold = True
+        End With
+        
+        ' Info rows
+        Dim infoStartRow As Long, infoRow As Long
+        infoStartRow = outRow + 1
+        infoRow = infoStartRow
+        Dim eArr As Variant
+        For Each eArr In tmpColl
+            Dim shName As String: shName = eArr(0)
+            Dim rnum As Long: rnum = eArr(1)
+            If shName = "Parts" Then
+                With shtParts
+                    Dim wVal As String, xVal As String
+                    wVal = Trim(CStr(.Cells(rnum, ColLetterToNumber("W")).Value))
+                    xVal = Trim(CStr(.Cells(rnum, ColLetterToNumber("X")).Value))
+                    xVal = RemoveLeadingApostrophe(xVal)
+                    shtOut.Cells(infoRow, "B").Value = Space(3) & wVal & " [" & xVal & "]"
+                    shtOut.Cells(infoRow, "I").Value = .Cells(rnum, ColLetterToNumber("AA")).Value
+                    shtOut.Cells(infoRow, "J").Value = .Cells(rnum, ColLetterToNumber("AC")).Value
+                    shtOut.Cells(infoRow, "K").Value = .Cells(rnum, ColLetterToNumber("AE")).Value
+                    shtOut.Cells(infoRow, "L").Value = .Cells(rnum, ColLetterToNumber("AF")).Value - .Cells(rnum, ColLetterToNumber("AG")).Value
+                End With
+            Else
+                With shtLab
+                    Dim wValL As String, xValL As String
+                    wValL = Trim(CStr(.Cells(rnum, ColLetterToNumber("W")).Value))
+                    xValL = Trim(CStr(.Cells(rnum, ColLetterToNumber("X")).Value))
+                    xValL = RemoveLeadingApostrophe(xValL)
+                    shtOut.Cells(infoRow, "B").Value = Space(3) & wValL & " [" & xValL & "]"
+                    shtOut.Cells(infoRow, "I").Value = ""
+                    shtOut.Cells(infoRow, "J").Value = ""
+                    shtOut.Cells(infoRow, "K").Value = .Cells(rnum, ColLetterToNumber("AC")).Value
+                    shtOut.Cells(infoRow, "L").Value = .Cells(rnum, ColLetterToNumber("AH")).Value
+                End With
+            End If
+            shtOut.Rows(infoRow).Font.Italic = True
+            infoRow = infoRow + 1
+        Next eArr
+        
+        ' Sums
+        Dim sumI As Double, sumK As Double, sumL As Double
+        sumI = 0: sumK = 0: sumL = 0
+        Dim rr As Long
+        For rr = infoStartRow To infoRow - 1
+            If IsNumeric(shtOut.Cells(rr, "I").Value) Then sumI = sumI + CDbl(shtOut.Cells(rr, "I").Value)
+            If IsNumeric(shtOut.Cells(rr, "K").Value) Then sumK = sumK + CDbl(shtOut.Cells(rr, "K").Value)
+            If IsNumeric(shtOut.Cells(rr, "L").Value) Then sumL = sumL + CDbl(shtOut.Cells(rr, "L").Value)
+        Next rr
+        shtOut.Cells(outRow, "I").Value = sumI
+        shtOut.Cells(outRow, "J").Value = ""
+        shtOut.Cells(outRow, "K").Value = sumK
+        shtOut.Cells(outRow, "L").Value = sumL
+        
+        outRow = infoRow
+    Next i
+    
+    ' Borders A:Y
+    Dim lastOutRow As Long
+    lastOutRow = outRow - 1
+    If lastOutRow < 2 Then lastOutRow = 2
+    With shtOut.Range("A2:Y" & lastOutRow).Borders
+        .LineStyle = xlContinuous
+        .Weight = xlThin
+    End With
+    
+    ' AutoFit
+    shtOut.Columns("A:Y").AutoFit
+    
+    ' Column A and Y date format
+    On Error Resume Next
+    shtOut.Columns("A").NumberFormat = "dd/mm/yyyy"
+    shtOut.Columns("Y").NumberFormat = "dd/mm/yyyy"
+    On Error GoTo 0
+    
+    ' Freeze panes
+    shtOut.Activate
+    shtOut.Range("A3").Select
+    ActiveWindow.FreezePanes = True
+    
+    MsgBox "Summary created on sheet 'Summary'. Last row: " & lastOutRow, vbInformation
+
+CleanUp:
+    Application.ScreenUpdating = True
+    Application.EnableEvents = True
+End Sub
+
+' ----------------- Helper Functions -----------------
+Private Function ColLetterToNumber(colLetter As String) As Long
+    colLetter = UCase(Trim(colLetter))
+    Dim i As Long, result As Long
+    result = 0
+    For i = 1 To Len(colLetter)
+        result = result * 26 + (Asc(Mid(colLetter, i, 1)) - Asc("A") + 1)
+    Next i
+    ColLetterToNumber = result
+End Function
+
+Private Function RemoveLeadingApostrophe(s As String) As String
+    If Len(s) = 0 Then
+        RemoveLeadingApostrophe = s
+        Exit Function
+    End If
+    Do While Left(s, 1) = "'" Or Left(s, 1) = "’"
+        s = Mid(s, 2)
+    Loop
+    RemoveLeadingApostrophe = s
+End Function
+
+Private Sub QuickSortString(arr() As String, ByVal first As Long, ByVal last As Long)
+    Dim low As Long, high As Long
+    Dim midVal As String, temp As String
+    low = first: high = last
+    midVal = arr((first + last) \ 2)
+    Do While low <= high
+        Do While StrComp(arr(low), midVal, vbTextCompare) < 0
+            low = low + 1
+        Loop
+        Do While StrComp(arr(high), midVal, vbTextCompare) > 0
+            high = high - 1
+        Loop
+        If low <= high Then
+            temp = arr(low)
+            arr(low) = arr(high)
+            arr(high) = temp
+            low = low + 1
+            high = high - 1
+        End If
+    Loop
+    If first < high Then QuickSortString arr, first, high
+    If low < last Then QuickSortString arr, low, last
+End Sub
