@@ -1,3 +1,62 @@
-Sub HelloWorld1()
-    MsgBox "Hello from Code 1"
+Private Sub Worksheet_Change(ByVal Target As Range)
+    Dim todayDate As String
+    todayDate = Format(Date, "dd-mm-yyyy")
+    
+    If Target.CountLarge > 1 Then Exit Sub
+    Application.EnableEvents = False
+    
+    ' --- Rule 1: Q entry ---
+    If Not Intersect(Target, Me.Columns("Q")) Is Nothing Then
+        With Target
+            ' Check Qty (S) and Value (U) not empty
+            If IsEmpty(Me.Cells(.Row, "S").Value) Or IsEmpty(Me.Cells(.Row, "U").Value) Then
+                MsgBox "Please fill Qty (S) and Value (U) before entering in column Q.", vbExclamation
+            End If
+            Me.Cells(.Row, "V").Value = .Value
+            Me.Cells(.Row, "T").Value = "Tax Invoice"
+            Me.Cells(.Row, "Y").Value = "Abhishek Patidar"
+            Me.Cells(.Row, "Z").Value = todayDate
+        End With
+    End If
+    
+    ' --- Rule 2: R entry ---
+    If Not Intersect(Target, Me.Columns("R")) Is Nothing Then
+        With Target
+            ' Check Value (U) not empty
+            If IsEmpty(Me.Cells(.Row, "U").Value) Then
+                MsgBox "Please fill Value (U) before entering in column R.", vbExclamation
+            End If
+            Me.Cells(.Row, "V").Value = .Value
+            Me.Cells(.Row, "T").Value = "Tax Invoice"
+            Me.Cells(.Row, "Y").Value = "Abhishek Patidar"
+            Me.Cells(.Row, "Z").Value = todayDate
+        End With
+    End If
+    
+    ' --- Rule 3: V, W, X entry ---
+    If Not Intersect(Target, Me.Columns("V:X")) Is Nothing Then
+        Select Case LCase(Target.Value)
+            Case "t"
+                Target.Value = "Tax Invoice Not Attested"
+            Case "r"
+                Target.Value = "Ro Closed By Zero"
+            Case "j"
+                Target.Value = "Job Description Sheet Not Attested"
+        End Select
+        Me.Cells(Target.Row, "Y").Value = "Abhishek Patidar"
+        Me.Cells(Target.Row, "Z").Value = todayDate
+    End If
+    
+    ' --- Rule 4: Y entry ---
+    If Not Intersect(Target, Me.Columns("Y")) Is Nothing Then
+        If LCase(Target.Value) = "a" Then
+            Me.Cells(Target.Row, "Y").Value = "Abhishek Patidar"
+            Me.Cells(Target.Row, "Z").Value = todayDate
+        End If
+    End If
+    
+    ' --- Rule 5: AutoFit whole sheet ---
+    Me.Cells.EntireColumn.AutoFit
+    
+    Application.EnableEvents = True
 End Sub
