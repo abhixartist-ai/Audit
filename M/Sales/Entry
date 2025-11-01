@@ -1,62 +1,65 @@
-Sub Prepare_Sales_Vouching()
-    Dim wsT As Worksheet, wsV As Worksheet, lr As Long, r As Long, pr As Long
-    Dim hd, txt, c
+Private Sub Worksheet_Change(ByVal Target As Range)
+    Dim todayDate As String
+    todayDate = Format(Date, "dd/mm/yyyy")
     
-    Set wsT = Sheets("Tally")
-    On Error Resume Next
-    Set wsV = Sheets("Sales Vouching")
-    If wsV Is Nothing Then
-        Set wsV = Sheets.Add(After:=Sheets(Sheets.Count))
-        wsV.Name = "Sales Vouching"
+    If Target.CountLarge > 1 Then Exit Sub 'Multiple cells ignore
+    
+    Application.EnableEvents = False
+    
+    ' --- Auto Calculations ---
+    If Target.Column = 6 Or Target.Column = 7 Then
+        Me.Cells(Target.Row, "H").Value = Me.Cells(Target.Row, "F").Value - Me.Cells(Target.Row, "G").Value
+    ElseIf Target.Column = 9 Or Target.Column = 10 Then
+        Me.Cells(Target.Row, "K").Value = Me.Cells(Target.Row, "J").Value - Me.Cells(Target.Row, "I").Value
+    ElseIf Target.Column = 13 Or Target.Column = 14 Then
+        Me.Cells(Target.Row, "O").Value = Me.Cells(Target.Row, "M").Value - Me.Cells(Target.Row, "N").Value
+    ElseIf Target.Column = 16 Or Target.Column = 17 Then
+        Me.Cells(Target.Row, "R").Value = Me.Cells(Target.Row, "P").Value - Me.Cells(Target.Row, "Q").Value
     End If
-    On Error GoTo 0
-    wsV.Cells.Clear
     
-    ' Headings
-    hd = Array("Invoice","Customer name","Frame","Invoice Date","Proposal Sheet Date", _
-               "Insurance as per tally","Insurance as per Proposal Sheet","Insurance Difff.", _
-               "RTO amount as per Proposal Sheet","RTO amount as per tally","RTO Diff.", _
-               "Dis Amount Repayment","Disb. Amount as per Tally","Disb. Amount as per Proposal Sheet", _
-               "Disb amount diff","TOTAL AS PER TALLY","Actual total as per Proposal Sheet","Total Difference", _
-               "Ledger Closing Balance","Sales consultant sign.","Customer sign.","Manager sign.","G M sign.", _
-               "Finance Manager sign.","Authorize Discount","Unauthorize Discount","Scheme Discount", _
-               "Authorize Person","Observation 1","Observation 2","Observation 3","Auditor","Vouching Date","Management Reply")
+    ' --- Yes/No Replacement (T: X = 20 to 24) ---
+    If Target.Column >= 20 And Target.Column <= 24 Then
+        Select Case LCase(Target.Value)
+            Case "y": Target.Value = "Yes"
+            Case "n": Target.Value = "No"
+        End Select
+    End If
     
-    For r = 0 To UBound(hd): wsV.Cells(1, r + 1).Value = hd(r): Next
-    With wsV.Rows(1)
-        .Font.Bold = True
-        .RowHeight = 50
-        .HorizontalAlignment = xlCenter
-        .VerticalAlignment = xlCenter
-        .WrapText = True
-        .Interior.ColorIndex = xlNone   ' keep blank (no fill) if not colored
-    End With
+    ' --- AB Column (MD Sir) ---
+    If Target.Column = 28 Then
+        If LCase(Target.Value) = "m" Then Target.Value = "MD Sir"
+    End If
     
-    ' Heading colors (only specified ones)
-    For Each c In Array("E","F","G","I","J","M","N","P","Q","S","T","U","V","W","X","AC","AD","AE","AF","AG"): wsV.Range(c & "1").Interior.Color = RGB(0, 176, 80): Next
-    For Each c In Array("L","AH"): wsV.Range(c & "1").Interior.Color = RGB(0, 176, 240): Next
-    For Each c In Array("H"): wsV.Range(c & "1").Interior.Color = RGB(255, 255, 0): Next
-    For Each c In Array("K","O","R"): wsV.Range(c & "1").Interior.Color = RGB(255, 0, 0): Next
-    For Each c In Array("Y","Z","AA","AB"): wsV.Range(c & "1").Interior.Color = RGB(147, 137, 83): Next
+    ' --- AC, AD, AE Column Codes (29-31) ---
+    If Target.Column >= 29 And Target.Column <= 31 Then
+        Select Case LCase(Target.Value)
+            Case "r": Target.Value = "RTO Process format not attached"
+            Case "s": Target.Value = "Screen Shot Approval not attached"
+            Case "f": Target.Value = "Finance Sanction latter not attached"
+            Case "o": Target.Value = "OK"
+            Case "c": Target.Value = "Consent Form not attached"
+            Case "u": Target.Value = "Undertaking Form not attached"
+            Case "d": Target.Value = "Discount Approval Sheet not attached"
+        End Select
+        ' --- If AC/AD/AE has something then AF,AG fill ---
+        If Target.Value <> "" Then
+            Me.Cells(Target.Row, "AF").Value = "Abhishek Patidar"
+            Me.Cells(Target.Row, "AG").Value = todayDate
+        End If
+    End If
     
-    ' Data copy
-    lr = wsT.Cells(wsT.Rows.Count, "A").End(xlUp).Row
-    pr = 2
-    For r = 9 To lr - 1
-        wsT.Cells(r, "D").Copy wsV.Cells(pr, "A")   'Tally D → A
-        wsT.Cells(r, "B").Copy wsV.Cells(pr, "B")   'Tally B → B
-        
-        txt = wsV.Cells(pr, "B").Value
-        If Len(txt) > 8 Then txt = Right(txt, 8)
-        wsV.Cells(pr, "C").Value = txt
-        wsV.Cells(pr, "C").Font.Bold = True         'Bold
-        
-        wsT.Cells(r, "A").Copy wsV.Cells(pr, "D")   'Tally A → D
-        pr = pr + 1
-    Next
+    ' --- AF Column (Abhishek Patidar if "a") ---
+    If Target.Column = 32 Then
+        If LCase(Target.Value) = "a" Then
+            Me.Cells(Target.Row, "AF").Value = "Abhishek Patidar"
+            Me.Cells(Target.Row, "AG").Value = todayDate
+        End If
+    End If
     
-    With wsV.UsedRange
-        .Columns.AutoFit
-        .Borders.LineStyle = xlContinuous
-    End With
+    ' --- Autofit only AC:AG ---
+    If Target.Column >= 29 And Target.Column <= 33 Then
+        Me.Range("AC:AG").EntireColumn.AutoFit
+    End If
+    
+    Application.EnableEvents = True
 End Sub
