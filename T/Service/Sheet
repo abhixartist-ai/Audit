@@ -49,7 +49,7 @@ Sub FullServiceVouchingWithDetails()
         .VerticalAlignment = xlCenter
         .Font.Bold = True
     End With
-    wsSV.Range("F2:J2").Interior.Color = RGB(0, 112, 192) ' Blue
+    wsSV.Range("F2:J2").Interior.Color = RGB(0, 176, 240) ' Blue
     wsSV.Range("Q2:AA2").Interior.Color = RGB(0, 176, 80)  ' Green
     wsSV.Cells(1, 22).Interior.Color = RGB(255, 0, 0)     ' Row1 Col V Red
     
