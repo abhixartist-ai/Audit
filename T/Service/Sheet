@@ -1,3 +1,231 @@
-Sub HelloWorld1()
-    MsgBox "Hello from Code 3"
+Sub FullServiceVouchingWithDetails()
+    On Error GoTo ErrHandler
+    Application.ScreenUpdating = False
+    Application.Calculation = xlCalculationManual
+    
+    Dim wb As Workbook: Set wb = ThisWorkbook
+    Dim wsSV As Worksheet, wsTally As Worksheet, wsDMS As Worksheet
+    Dim wsParts As Worksheet, wsLab As Worksheet
+    Dim lastRowT As Long, lastRowSV As Long, lastRowDMS As Long
+    Dim lastRowParts As Long, lastRowLab As Long
+    Dim i As Long, pasteRow As Long, r As Long, p As Long, l As Long
+    Dim valID As String, newID As String
+    Dim lookupVal As String, rngFound As Range
+    Dim refNo As String
+    Dim dataRowStart As Long: dataRowStart = 2 ' header row = 1, data starts row 2
+    
+    ' === Worksheets (change names here if different) ===
+    Set wsTally = wb.Sheets("Tally")
+    Set wsDMS = wb.Sheets("DMS")
+    Set wsParts = wb.Sheets("Parts")
+    Set wsLab = wb.Sheets("Lab")
+    
+    ' Create or get Service Vouching sheet
+    On Error Resume Next
+    Set wsSV = wb.Sheets("Service Vouching")
+    If wsSV Is Nothing Then
+        Set wsSV = wb.Sheets.Add(After:=wb.Sheets(wb.Sheets.Count))
+        wsSV.Name = "Service Vouching"
+    End If
+    On Error GoTo ErrHandler
+    
+    ' === Clear previous data (from row 3 down) but keep row1/row2 headings if exist ===
+    wsSV.Rows("3:" & wsSV.Rows.Count).Clear
+    
+    ' === HEADINGS (row 2) - will overwrite row2 values ===
+    Dim headings As Variant
+    headings = Array("Date", "Particulars", "chassis No.", "Voucher Type", "voucher No.", _
+                     "Reg. no.", "Invoice Doc. Date", "Job Order No.", "Vin. No.", "Advisor Name", _
+                     "Quantity", "Rate", "Value", "Gross Total", "DMS Value", "Value Difference", _
+                     "Active AMC", "Parts Skipped", "Labour Skipped", "Qty. Skipped", "Skipped Juncture", _
+                     "Skipped Value", "Observation 1", "Observation 2", "Observation 3", "Auditor", "Vouching Date")
+    Dim col As Long
+    For col = 0 To UBound(headings)
+        wsSV.Cells(2, col + 1).Value = headings(col)
+    Next col
+    With wsSV.Rows(2)
+        .RowHeight = 30
+        .HorizontalAlignment = xlCenter
+        .VerticalAlignment = xlCenter
+        .Font.Bold = True
+    End With
+    wsSV.Range("F2:J2").Interior.Color = RGB(0, 112, 192) ' Blue
+    wsSV.Range("Q2:AA2").Interior.Color = RGB(0, 176, 80)  ' Green
+    wsSV.Cells(1, 22).Interior.Color = RGB(255, 0, 0)     ' Row1 Col V Red
+    
+    ' === Transfer data from Tally (as before) ===
+    lastRowT = wsTally.Cells(wsTally.Rows.Count, "D").End(xlUp).Row
+    pasteRow = 3 ' start at row 3 in service vouching
+    For i = 1 To lastRowT
+        ' ignore rows 1-9
+        If i <= 9 Then GoTo SkipTally
+        valID = Trim(wsTally.Cells(i, "D").Value & "")
+        If valID <> "" Then
+            If Left(valID, 3) = "F25" Or Left(valID, 2) = "AA" Or Left(valID, 3) = "A25" Or Left(valID, 2) = "25" Then GoTo SkipTally
+        End If
+        If Trim(wsTally.Cells(i, "B").Value & "") = "Bhagawati Velocity Motors Pvt Ltd (PDI)" Then GoTo SkipTally
+        
+        With wsSV
+            .Cells(pasteRow, "A").Value = wsTally.Cells(i, "A").Value ' Date
+            .Cells(pasteRow, "B").Value = wsTally.Cells(i, "B").Value ' Particulars
+            .Cells(pasteRow, "D").Value = wsTally.Cells(i, "C").Value ' chassis -> D
+            newID = wsTally.Cells(i, "D").Value
+            If Len(newID) = 10 Then newID = Left(newID, 5) & "-" & Right(newID, 5)
+            .Cells(pasteRow, "E").Value = newID ' voucher no -> E
+            .Cells(pasteRow, "N").Value = wsTally.Cells(i, "E").Value ' Value -> N
+        End With
+        pasteRow = pasteRow + 1
+SkipTally:
+    Next i
+    
+    ' === Transfer from DMS using lookup on E ? DMS K (as before) ===
+    lastRowSV = wsSV.Cells(wsSV.Rows.Count, "E").End(xlUp).Row
+    lastRowDMS = wsDMS.Cells(wsDMS.Rows.Count, "K").End(xlUp).Row
+    For i = 3 To lastRowSV
+        lookupVal = wsSV.Cells(i, "E").Value
+        If Len(Trim(lookupVal)) > 0 Then
+            Set rngFound = wsDMS.Range("K1:K" & lastRowDMS).Find(What:=lookupVal, LookIn:=xlValues, LookAt:=xlWhole)
+            If Not rngFound Is Nothing Then
+                refNo = Right(wsDMS.Cells(rngFound.Row, "C").Value & "", 6)
+                wsSV.Cells(i, "C").Value = refNo
+                wsSV.Cells(i, "F").Value = wsDMS.Cells(rngFound.Row, "E").Value
+                wsSV.Cells(i, "G").Value = wsDMS.Cells(rngFound.Row, "L").Value
+                wsSV.Cells(i, "H").Value = wsDMS.Cells(rngFound.Row, "I").Value
+                wsSV.Cells(i, "I").Value = wsDMS.Cells(rngFound.Row, "C").Value
+                wsSV.Cells(i, "J").Value = wsDMS.Cells(rngFound.Row, "AF").Value
+                wsSV.Cells(i, "M").Value = wsDMS.Cells(rngFound.Row, "Y").Value - wsDMS.Cells(rngFound.Row, "AA").Value
+            End If
+        End If
+    Next i
+    
+    ' === Prepare Parts sheet: add/overwrite col M header "After Tax" and compute After Tax ===
+    lastRowParts = wsParts.Cells(wsParts.Rows.Count, "C").End(xlUp).Row
+    wsParts.Cells(1, "M").Value = "After Tax"
+    For p = dataRowStart To lastRowParts
+        Dim partL As Double, taxRate As Double
+        partL = Val(wsParts.Cells(p, "L").Value)
+        If InStr(1, UCase(wsParts.Cells(p, "H").Value & ""), "WEIGHT", vbTextCompare) > 0 Then
+            taxRate = 0.28
+        Else
+            taxRate = 0.18
+        End If
+        wsParts.Cells(p, "M").Value = WorksheetFunction.Round(partL * (1 + taxRate), 2)
+    Next p
+    
+    ' === Prepare Lab sheet: insert/overwrite col O header "After Tax" and compute ===
+    lastRowLab = wsLab.Cells(wsLab.Rows.Count, "C").End(xlUp).Row
+    wsLab.Cells(1, "O").Value = "After Tax"
+    For l = dataRowStart To lastRowLab
+        Dim labN As Double
+        labN = Val(wsLab.Cells(l, "N").Value)
+        wsLab.Cells(l, "O").Value = WorksheetFunction.Round(labN * 1.18, 2)
+    Next l
+    
+    ' === Insert detail rows under each summary row (iterate bottom-up) ===
+    lastRowSV = wsSV.Cells(wsSV.Rows.Count, "H").End(xlUp).Row
+    For r = lastRowSV To 3 Step -1
+        Dim summaryID As String
+        summaryID = Trim(wsSV.Cells(r, "H").Value & "")
+        If summaryID <> "" Then
+            Dim idNoHyphen As String: idNoHyphen = Replace(summaryID, "-", "")
+            Dim insertAt As Long: insertAt = r + 1
+            Dim startInsert As Long: startInsert = insertAt
+            Dim insertedCount As Long: insertedCount = 0
+            
+            ' --- PARTS matches first ---
+            For p = lastRowParts To dataRowStart Step -1 ' iterate bottom-up optional
+                If Trim(wsParts.Cells(p, "C").Value & "") <> "" Then
+                    If Replace(Trim(wsParts.Cells(p, "C").Value & ""), "-", "") = idNoHyphen Then
+                        wsSV.Rows(insertAt).Insert Shift:=xlDown
+                        insertedCount = insertedCount + 1
+                        
+                        ' B = H & " [" & G & "]" italic
+                        wsSV.Cells(insertAt, "B").Value = Trim(wsParts.Cells(p, "H").Value & "") & " [" & Trim(wsParts.Cells(p, "G").Value & "") & "]"
+                        wsSV.Cells(insertAt, "B").Font.Italic = True
+                        
+                        'indent
+                        wsSV.Cells(insertAt, "B").IndentLevel = 2
+                        
+                        ' K = Parts I
+                        wsSV.Cells(insertAt, "K").Value = wsParts.Cells(p, "I").Value
+                        ' L = J / I (guard)
+                        Dim denom As Double: denom = Val(wsParts.Cells(p, "I").Value)
+                        If denom = 0 Then
+                            wsSV.Cells(insertAt, "L").Value = 0
+                        Else
+                            wsSV.Cells(insertAt, "L").Value = wsParts.Cells(p, "J").Value / denom
+                        End If
+                        ' M = Parts L
+                        wsSV.Cells(insertAt, "M").Value = wsParts.Cells(p, "L").Value
+                        ' N = Parts M (After Tax)
+                        wsSV.Cells(insertAt, "N").Value = wsParts.Cells(p, "M").Value
+                        
+                        insertAt = insertAt + 1
+                    End If
+                End If
+            Next p
+            
+            ' --- LAB matches next ---
+            For l = lastRowLab To dataRowStart Step -1
+                If Trim(wsLab.Cells(l, "C").Value & "") <> "" Then
+                    If Replace(Trim(wsLab.Cells(l, "C").Value & ""), "-", "") = idNoHyphen Then
+                        wsSV.Rows(insertAt).Insert Shift:=xlDown
+                        insertedCount = insertedCount + 1
+                        
+                        ' B = J & " [" & I & "]" italic
+                        wsSV.Cells(insertAt, "B").Value = Trim(wsLab.Cells(l, "J").Value & "") & " [" & Trim(wsLab.Cells(l, "I").Value & "") & "]"
+                        wsSV.Cells(insertAt, "B").Font.Italic = True
+                        
+                        'indent
+                        wsSV.Cells(insertAt, "B").IndentLevel = 3
+                        
+                        ' M = Lab N
+                        wsSV.Cells(insertAt, "M").Value = wsLab.Cells(l, "N").Value
+                        ' N = Lab O (After Tax)
+                        wsSV.Cells(insertAt, "N").Value = wsLab.Cells(l, "O").Value
+                        
+                        insertAt = insertAt + 1
+                    End If
+                End If
+            Next l
+            
+            ' --- After inserting details, compute summary sums if any details were inserted ---
+            If insertedCount > 0 Then
+                Dim lastInsertedRow As Long: lastInsertedRow = insertAt - 1
+                Dim rngK As Range, rngN As Range, rngO As Range
+                Set rngK = wsSV.Range(wsSV.Cells(r + 1, "K"), wsSV.Cells(lastInsertedRow, "K"))
+                Set rngN = wsSV.Range(wsSV.Cells(r + 1, "N"), wsSV.Cells(lastInsertedRow, "N"))
+                On Error Resume Next
+                wsSV.Cells(r, "K").Value = Application.WorksheetFunction.Sum(rngK)
+                wsSV.Cells(r, "O").Value = Application.WorksheetFunction.Sum(rngN)
+                On Error GoTo ErrHandler
+          'bold summary rowa b,d,n
+                wsSV.Cells(r, "B").Font.Bold = True
+                wsSV.Cells(r, "D").Font.Bold = True
+                wsSV.Cells(r, "N").Font.Bold = True
+            End If
+        End If
+    Next r
+    
+    ' === After all inserts, put formula in V1: sum of W from row3 to last ===
+    lastRowSV = wsSV.Cells(wsSV.Rows.Count, "W").End(xlUp).Row
+    If lastRowSV < 3 Then lastRowSV = 3
+    wsSV.Range("V1").Formula = "=SUM(W3:W" & lastRowSV & ")"
+    
+    ' === Formatting: autofit and borders for the used data range ===
+    Dim usedRng As Range
+    Set usedRng = wsSV.UsedRange
+    usedRng.Borders.LineStyle = xlContinuous
+    wsSV.Columns.AutoFit
+    
+    ' Bring screen update back
+    Application.Calculation = xlCalculationAutomatic
+    Application.ScreenUpdating = True
+    MsgBox "Complete: Service Vouching updated with Parts & Lab detail rows, After-Tax columns added, totals computed.", vbInformation
+    Exit Sub
+
+ErrHandler:
+    Application.Calculation = xlCalculationAutomatic
+    Application.ScreenUpdating = True
+    MsgBox "Error: " & Err.Number & " - " & Err.Description, vbCritical
 End Sub
