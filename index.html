@@ -1,111 +1,186 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
-<title>SKU Extract Tool</title>
+<title>Label & SKU Tool</title>
 
 <style>
+
 body{
 font-family:Arial;
-background:#f4f6fb;
+background:#667eea;
+background:linear-gradient(135deg,#667eea,#764ba2);
+padding:30px;
+}
+
+.card{
+background:white;
 padding:20px;
+border-radius:10px;
+box-shadow:0 10px 20px rgba(0,0,0,0.15);
+max-width:900px;
+margin:auto;
+}
+
+textarea{
+width:100%;
+height:200px;
+margin-top:10px;
+}
+
+button{
+padding:10px 20px;
+margin-top:10px;
+cursor:pointer;
 }
 
 table{
-border-collapse:collapse;
 width:100%;
+border-collapse:collapse;
 margin-top:20px;
-background:white;
 }
 
 th,td{
-border:1px solid #ccc;
+border:1px solid #ddd;
 padding:8px;
+text-align:left;
 }
 
 th{
-background:#667eea;
-color:white;
+background:#f5f5f5;
 }
-</style>
 
+</style>
 </head>
 
 <body>
 
-<h2>SKU Extract Tool</h2>
+<div class="card">
 
-<input type="file" id="fileInput">
+<h2>Amazon / Flipkart SKU Tool</h2>
 
-<table id="resultTable">
+<select id="platform">
+<option>Amazon</option>
+<option>Flipkart</option>
+</select>
 
+<p>Paste Invoice Table (Description + Qty)</p>
+
+<textarea id="inputData"></textarea>
+
+<br>
+
+<button onclick="processData()">Generate SKU Summary</button>
+
+<button onclick="window.print()">Print</button>
+
+<h3>Order Data</h3>
+
+<table id="orderTable">
 <thead>
 <tr>
 <th>Description</th>
 <th>SKU</th>
-<th>Quantity</th>
+<th>Qty</th>
 </tr>
 </thead>
-
 <tbody></tbody>
-
 </table>
+
+<h3>SKU Summary</h3>
+
+<table id="summaryTable">
+<thead>
+<tr>
+<th>SKU</th>
+<th>Total Qty</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+
+</div>
 
 <script>
 
-document.getElementById("fileInput").addEventListener("change",function(e){
+function processData(){
 
-let file = e.target.files[0];
+let text=document.getElementById("inputData").value.trim()
 
-let reader = new FileReader();
+let rows=text.split("\n")
 
-reader.onload=function(event){
+let tableBody=document.querySelector("#orderTable tbody")
 
-let text = event.target.result;
+let summaryBody=document.querySelector("#summaryTable tbody")
 
-let rows = text.split(/\r?\n/);
+tableBody.innerHTML=""
+summaryBody.innerHTML=""
 
-let tableBody = document.querySelector("#resultTable tbody");
-
-tableBody.innerHTML="";
+let skuTotals={}
 
 rows.forEach(function(row){
 
-if(row.trim()=="") return;
+if(row.trim()=="") return
 
-let cols = row.split("\t");
+let cols=row.split("\t")
 
-let description = cols[0] || "";
-let qty = cols[1] || "";
+let description=cols[0]||""
 
-/* LAST bracket extract */
+let qty=parseInt(cols[1])||1
 
-let lastOpen = description.lastIndexOf("(");
-let lastClose = description.lastIndexOf(")");
 
-let sku = "SKU Unknown";
+// find last bracket SKU
 
-if(lastOpen !== -1 && lastClose !== -1 && lastClose > lastOpen){
-sku = description.substring(lastOpen+1,lastClose);
+let matches=description.match(/\(([^()]*)\)/g)
+
+let sku="SKU Unknown"
+
+if(matches){
+
+sku=matches[matches.length-1].replace(/[()]/g,"")
+
 }
 
-let tr=document.createElement("tr");
 
-tr.innerHTML=`
-<td>${description}</td>
-<td>${sku}</td>
-<td>${qty}</td>
-`;
+// order table row
 
-tableBody.appendChild(tr);
+let tr=document.createElement("tr")
 
-});
+tr.innerHTML=
+"<td>"+description+"</td>"+
+"<td>"+sku+"</td>"+
+"<td>"+qty+"</td>"
 
-};
+tableBody.appendChild(tr)
 
-reader.readAsText(file);
 
-});
+// summary
+
+if(!skuTotals[sku]){
+
+skuTotals[sku]=0
+
+}
+
+skuTotals[sku]+=qty
+
+})
+
+
+// summary table
+
+for(let sku in skuTotals){
+
+let tr=document.createElement("tr")
+
+tr.innerHTML=
+"<td>"+sku+"</td>"+
+"<td>"+skuTotals[sku]+"</td>"
+
+summaryBody.appendChild(tr)
+
+}
+
+}
 
 </script>
 
