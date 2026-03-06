@@ -42,7 +42,7 @@ for(let page=1;page<=pdf.numPages;page++){
 
 const p=await pdf.getPage(page)
 
-const viewport=p.getViewport({scale:1.1})
+const viewport=p.getViewport({scale:1.2})
 
 const canvas=document.createElement("canvas")
 const context=canvas.getContext("2d")
@@ -57,9 +57,10 @@ preview.appendChild(canvas)
 const textContent=await p.getTextContent()
 
 let pageText=""
-textContent.items.forEach(item=>{pageText+=item.str+" "})
+textContent.items.forEach(item=>{
+pageText+=item.str+" "
+})
 
-// detect invoice page (because SKU + Qty are there)
 if(isInvoicePage(pageText)){
 extractInvoiceData(pageText)
 }
@@ -72,27 +73,28 @@ updateTable()
 
 function isInvoicePage(text){
 
-// invoice pages usually contain these words
-if(text.toLowerCase().includes("description") && text.toLowerCase().includes("qty")){
-return true
-}
+let t=text.toLowerCase()
 
-return false
+return t.includes("description") && t.includes("qty")
 
 }
 
 function extractInvoiceData(text){
 
-// try to capture SKU in description column
-let skuMatch=text.match(/SKU[: ]*([A-Za-z0-9._-]+)/i)
+// SKU inside brackets example: Product Name (ICEBALL01)
+let skuMatch=text.match(/\(([A-Za-z0-9._-]{3,})\)/)
 
-let qtyMatch=text.match(/Qty[: ]*(d+)/i)
+// Qty column
+let qtyMatch=text.match(/qty[: ]*(\d+)/i)
 
-let sku=skuMatch ? skuMatch[1] : "UNKNOWN"
-let qty=qtyMatch ? parseInt(qtyMatch[1]) : 1
+let sku = skuMatch ? skuMatch[1] : "UNKNOWN"
+let qty = qtyMatch ? parseInt(qtyMatch[1]) : 1
 
-if(skuSummary[sku]) skuSummary[sku]+=qty
-else skuSummary[sku]=qty
+if(skuSummary[sku]){
+skuSummary[sku]+=qty
+}else{
+skuSummary[sku]=qty
+}
 
 }
 
@@ -111,20 +113,22 @@ row.insertCell(1).innerText=skuSummary[sku]
 }
 
 if(Object.keys(skuSummary).length===0){
+
 let row=table.insertRow()
-row.insertCell(0).innerText="No invoice data detected"
+row.insertCell(0).innerText="No invoice detected"
 row.insertCell(1).innerText=""
+
 }
 
 }
 
 function downloadCSV(){
 
-let csv="SKU,Qtyn"
+let csv="SKU,Qty\n"
 
 for(let sku in skuSummary){
 
-csv+=sku+","+skuSummary[sku]+"n"
+csv+=sku+","+skuSummary[sku]+"\n"
 
 }
 
