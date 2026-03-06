@@ -1,148 +1,113 @@
-<!DOCTYPE html><html>
+<!DOCTYPE html>
+<html>
 <head>
 <meta charset="UTF-8">
-<title>Seller Label Tool</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<title>SKU Extract Tool</title>
+
 <style>
-body{font-family:Arial;background:#f5f6fb;text-align:center;padding:30px}
-.card{background:white;padding:20px;border-radius:12px;max-width:900px;margin:auto;box-shadow:0 10px 25px rgba(0,0,0,0.1)}
-select,input,button{padding:10px;margin:10px}
-button{cursor:pointer}
-table{border-collapse:collapse;margin:auto;margin-top:20px}
-th,td{border:1px solid #ccc;padding:8px 12px}
-#preview canvas{margin:10px;border:1px solid #ccc}
+body{
+font-family:Arial;
+background:#f4f6fb;
+padding:20px;
+}
+
+table{
+border-collapse:collapse;
+width:100%;
+margin-top:20px;
+background:white;
+}
+
+th,td{
+border:1px solid #ccc;
+padding:8px;
+}
+
+th{
+background:#667eea;
+color:white;
+}
 </style>
+
 </head>
-<body><div class="card">
-<h2>Amazon / Flipkart Label Tool</h2><select id="platform">
-<option value="amazon">Amazon</option>
-<option value="flipkart">Flipkart</option>
-</select><input type="file" id="pdfUpload" accept="application/pdf"><br><button onclick="processPDF()">Process Labels</button> <button onclick="downloadCSV()">Download SKU Summary</button>
 
-<div id="preview"></div><h3>SKU Summary</h3><table id="summaryTable">
-<tr><th>SKU</th><th>Qty</th></tr>
-</table></div><script>
+<body>
 
-let skuSummary={}
+<h2>SKU Extract Tool</h2>
 
-async function processPDF(){
+<input type="file" id="fileInput">
 
-const file=document.getElementById("pdfUpload").files[0]
-if(!file){alert("Upload PDF first");return}
+<table id="resultTable">
 
-const data=await file.arrayBuffer()
-const pdf=await pdfjsLib.getDocument({data}).promise
+<thead>
+<tr>
+<th>Description</th>
+<th>SKU</th>
+<th>Quantity</th>
+</tr>
+</thead>
 
-const preview=document.getElementById("preview")
-preview.innerHTML=""
+<tbody></tbody>
 
-skuSummary={}
+</table>
 
-for(let page=1;page<=pdf.numPages;page++){
+<script>
 
-const p=await pdf.getPage(page)
+document.getElementById("fileInput").addEventListener("change",function(e){
 
-const viewport=p.getViewport({scale:1.2})
+let file = e.target.files[0];
 
-const canvas=document.createElement("canvas")
-const context=canvas.getContext("2d")
+let reader = new FileReader();
 
-canvas.height=viewport.height
-canvas.width=viewport.width
+reader.onload=function(event){
 
-await p.render({canvasContext:context,viewport}).promise
+let text = event.target.result;
 
-preview.appendChild(canvas)
+let rows = text.split(/\r?\n/);
 
-const textContent=await p.getTextContent()
+let tableBody = document.querySelector("#resultTable tbody");
 
-let pageText=""
-textContent.items.forEach(item=>{
-pageText+=item.str+" "
-})
+tableBody.innerHTML="";
 
-if(isInvoicePage(pageText)){
-extractInvoiceData(pageText)
+rows.forEach(function(row){
+
+if(row.trim()=="") return;
+
+let cols = row.split("\t");
+
+let description = cols[0] || "";
+let qty = cols[1] || "";
+
+/* LAST bracket extract */
+
+let lastOpen = description.lastIndexOf("(");
+let lastClose = description.lastIndexOf(")");
+
+let sku = "SKU Unknown";
+
+if(lastOpen !== -1 && lastClose !== -1 && lastClose > lastOpen){
+sku = description.substring(lastOpen+1,lastClose);
 }
 
-}
+let tr=document.createElement("tr");
 
-updateTable()
+tr.innerHTML=`
+<td>${description}</td>
+<td>${sku}</td>
+<td>${qty}</td>
+`;
 
-}
+tableBody.appendChild(tr);
 
-function isInvoicePage(text){
+});
 
-let t=text.toLowerCase()
+};
 
-return t.includes("description") && t.includes("qty")
+reader.readAsText(file);
 
-}
+});
 
-function extractInvoiceData(text){
+</script>
 
-// SKU inside brackets example: Product Name (ICEBALL01)
-let skuMatch=text.match(/\(([A-Za-z0-9._-]{3,})\)/)
-
-// Qty column
-let qtyMatch=text.match(/qty[: ]*(\d+)/i)
-
-let sku = skuMatch ? skuMatch[1] : "UNKNOWN"
-let qty = qtyMatch ? parseInt(qtyMatch[1]) : 1
-
-if(skuSummary[sku]){
-skuSummary[sku]+=qty
-}else{
-skuSummary[sku]=qty
-}
-
-}
-
-function updateTable(){
-
-const table=document.getElementById("summaryTable")
-
-while(table.rows.length>1) table.deleteRow(1)
-
-for(let sku in skuSummary){
-
-let row=table.insertRow()
-row.insertCell(0).innerText=sku
-row.insertCell(1).innerText=skuSummary[sku]
-
-}
-
-if(Object.keys(skuSummary).length===0){
-
-let row=table.insertRow()
-row.insertCell(0).innerText="No invoice detected"
-row.insertCell(1).innerText=""
-
-}
-
-}
-
-function downloadCSV(){
-
-let csv="SKU,Qty\n"
-
-for(let sku in skuSummary){
-
-csv+=sku+","+skuSummary[sku]+"\n"
-
-}
-
-const blob=new Blob([csv])
-
-const a=document.createElement("a")
-
-a.href=URL.createObjectURL(blob)
-
-a.download="sku-summary.csv"
-
-a.click()
-
-}
-
-</script></body>
+</body>
 </html>
