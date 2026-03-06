@@ -1,8 +1,7 @@
 <!DOCTYPE html><html>
 <head>
 <meta charset="UTF-8">
-<title>Amazon / Flipkart Label & SKU Tool</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script><style>
+<title>Amazon / Flipkart Label & SKU Tool</title><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script><style>
 body{
 font-family:Arial;
 background:linear-gradient(135deg,#667eea,#764ba2);
@@ -28,6 +27,7 @@ button{cursor:pointer}
 #preview canvas{
 border:1px solid #ccc;
 margin:10px;
+max-width:100%;
 }
 
 table{
@@ -46,20 +46,9 @@ th{background:#f5f5f5}
 </style></head><body><div class="card"><h2>Amazon / Flipkart Label & SKU Tool</h2><select id="platform">
 <option value="amazon">Amazon</option>
 <option value="flipkart">Flipkart</option>
-</select><br><input type="file" id="pdfUpload" accept="application/pdf"><br><button onclick="processPDF()">Process File</button>
+</select><br><input type="file" id="pdfUpload" accept="application/pdf"><br><button id="processBtn">Process File</button> <button onclick="downloadCSV()">Download SKU Summary</button>
 
-<button onclick="downloadCSV()">Download SKU Summary</button>
-
-<div id="preview"></div><h3>Order Data</h3><table id="orderTable">
-<thead>
-<tr>
-<th>Description</th>
-<th>SKU</th>
-<th>Qty</th>
-</tr>
-</thead>
-<tbody></tbody>
-</table><h3>SKU Summary</h3><table id="summaryTable">
+<div id="preview"></div><h3>SKU Summary</h3><table id="summaryTable">
 <thead>
 <tr>
 <th>SKU</th>
@@ -69,105 +58,89 @@ th{background:#f5f5f5}
 <tbody></tbody>
 </table></div><script>
 
-// PDF.js worker setup
 pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
+let skuTotals = {}
 
-let skuTotals={}
+document.getElementById("processBtn").addEventListener("click", processPDF)
 
 async function processPDF(){
 
-const file=document.getElementById("pdfUpload").files[0]
+const fileInput = document.getElementById("pdfUpload")
 
-if(!file){
-alert("Please upload PDF first")
+if(fileInput.files.length === 0){
+alert("Please upload PDF file first")
 return
 }
 
-skuTotals={}
+const file = fileInput.files[0]
 
-document.querySelector("#orderTable tbody").innerHTML=""
-document.querySelector("#summaryTable tbody").innerHTML=""
+skuTotals = {}
 
-const data=await file.arrayBuffer()
+document.querySelector("#summaryTable tbody").innerHTML = ""
 
-const pdf=await pdfjsLib.getDocument({data}).promise
+document.getElementById("preview").innerHTML = "Processing PDF..."
 
-for(let page=1;page<=pdf.numPages;page++){
+const arrayBuffer = await file.arrayBuffer()
 
-const p=await pdf.getPage(page)
+const pdf = await pdfjsLib.getDocument({data:arrayBuffer}).promise
 
-const textContent=await p.getTextContent()
+let fullText = ""
 
-let pageText=""
+for(let page=1; page<=pdf.numPages; page++){
+
+const p = await pdf.getPage(page)
+
+const textContent = await p.getTextContent()
 
 textContent.items.forEach(item=>{
-pageText+=item.str+" "
+fullText += item.str + " "
 })
 
-extractOrders(pageText)
+}
+
+extractData(fullText)
 
 }
+
+function extractData(text){
+
+// find all bracket values
+
+let brackets = text.match(/([^()]*)/g)
+
+if(!brackets){
+alert("No SKU found in brackets")
+return
+}
+
+brackets.forEach(b=>{
+
+let sku = b.replace(/[()]/g,"").trim()
+
+// ignore small text inside brackets
+
+if(sku.length < 3) return
+
+if(!skuTotals[sku]) skuTotals[sku] = 0
+
+skuTotals[sku] += 1
+
+})
 
 updateSummary()
 
 }
 
-function extractOrders(text){
-
-// split by Qty words or numbers pattern
-
-let lines=text.split(/Qty|QTY|qty/)
-
-lines.forEach(line=>{
-
-let qtyMatch=line.match(/(\d+)/)
-
-if(!qtyMatch) return
-
-let qty=parseInt(qtyMatch[1])
-
-// find last bracket as SKU
-
-let brackets=line.match(/([^()]*)/g)
-
-if(!brackets) return
-
-let sku=brackets[brackets.length-1].replace(/[()]/g,"").trim()
-
-let description=line.trim()
-
-addOrder(description,sku,qty)
-
-})
-
-}
-
-function addOrder(description,sku,qty){
-
-const tbody=document.querySelector("#orderTable tbody")
-
-let tr=document.createElement("tr")
-
-tr.innerHTML="<td>"+description+"</td><td>"+sku+"</td><td>"+qty+"</td>"
-
-tbody.appendChild(tr)
-
-if(!skuTotals[sku]) skuTotals[sku]=0
-
-skuTotals[sku]+=qty
-
-}
-
 function updateSummary(){
 
-const tbody=document.querySelector("#summaryTable tbody")
+const tbody = document.querySelector("#summaryTable tbody")
 
 for(let sku in skuTotals){
 
-let tr=document.createElement("tr")
+let tr = document.createElement("tr")
 
-tr.innerHTML="<td>"+sku+"</td><td>"+skuTotals[sku]+"</td>"
+tr.innerHTML = `<td>${sku}</td><td>${skuTotals[sku]}</td>`
 
 tbody.appendChild(tr)
 
@@ -177,21 +150,21 @@ tbody.appendChild(tr)
 
 function downloadCSV(){
 
-let csv="SKU,Qty\n"
+let csv = "SKU,Qty\n"
 
 for(let sku in skuTotals){
 
-csv+=sku+","+skuTotals[sku]+"\n"
+csv += sku + "," + skuTotals[sku] + "\n"
 
 }
 
-const blob=new Blob([csv])
+const blob = new Blob([csv])
 
-const a=document.createElement("a")
+const a = document.createElement("a")
 
-a.href=URL.createObjectURL(blob)
+a.href = URL.createObjectURL(blob)
 
-a.download="sku-summary.csv"
+a.download = "sku-summary.csv"
 
 a.click()
 
