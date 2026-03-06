@@ -24,7 +24,6 @@ th,td{border:1px solid #ccc;padding:8px 12px}
 </table></div><script>
 
 let skuSummary={}
-let orderList=[]
 
 async function processPDF(){
 
@@ -38,13 +37,12 @@ const preview=document.getElementById("preview")
 preview.innerHTML=""
 
 skuSummary={}
-orderList=[]
 
 for(let page=1;page<=pdf.numPages;page++){
 
 const p=await pdf.getPage(page)
 
-const viewport=p.getViewport({scale:1.2})
+const viewport=p.getViewport({scale:1.1})
 
 const canvas=document.createElement("canvas")
 const context=canvas.getContext("2d")
@@ -61,14 +59,10 @@ const textContent=await p.getTextContent()
 let pageText=""
 textContent.items.forEach(item=>{pageText+=item.str+" "})
 
-let sku=findSKU(pageText)
-
-if(!sku) sku="UNKNOWN"
-
-orderList.push(sku)
-
-if(skuSummary[sku]) skuSummary[sku]++
-else skuSummary[sku]=1
+// detect invoice page (because SKU + Qty are there)
+if(isInvoicePage(pageText)){
+extractInvoiceData(pageText)
+}
 
 }
 
@@ -76,19 +70,29 @@ updateTable()
 
 }
 
-function findSKU(text){
+function isInvoicePage(text){
 
-let patterns=[
-/(Seller\s*SKU)[:# ]*([A-Za-z0-9._-]+)/i,
-/(SKU)[:# ]*([A-Za-z0-9._-]+)/i
-]
-
-for(let p of patterns){
-let m=text.match(p)
-if(m) return m[2]
+// invoice pages usually contain these words
+if(text.toLowerCase().includes("description") && text.toLowerCase().includes("qty")){
+return true
 }
 
-return null
+return false
+
+}
+
+function extractInvoiceData(text){
+
+// try to capture SKU in description column
+let skuMatch=text.match(/SKU[: ]*([A-Za-z0-9._-]+)/i)
+
+let qtyMatch=text.match(/Qty[: ]*(d+)/i)
+
+let sku=skuMatch ? skuMatch[1] : "UNKNOWN"
+let qty=qtyMatch ? parseInt(qtyMatch[1]) : 1
+
+if(skuSummary[sku]) skuSummary[sku]+=qty
+else skuSummary[sku]=qty
 
 }
 
@@ -106,15 +110,21 @@ row.insertCell(1).innerText=skuSummary[sku]
 
 }
 
+if(Object.keys(skuSummary).length===0){
+let row=table.insertRow()
+row.insertCell(0).innerText="No invoice data detected"
+row.insertCell(1).innerText=""
+}
+
 }
 
 function downloadCSV(){
 
-let csv="SKU,Qty\n"
+let csv="SKU,Qtyn"
 
 for(let sku in skuSummary){
 
-csv+=sku+","+skuSummary[sku]+"\n"
+csv+=sku+","+skuSummary[sku]+"n"
 
 }
 
