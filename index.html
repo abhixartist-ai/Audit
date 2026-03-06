@@ -72,7 +72,7 @@ updateTable()
 
 function extractSKU(text){
 
-const regex=/SKU[: ]*([A-Za-z0-9_-]+)/gi
+const regex=/(Seller\s*SKU|SKU)[:# ]*([A-Za-z0-9._-]+)/gi
 
 let match
 
