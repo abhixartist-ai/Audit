@@ -24,6 +24,7 @@ th,td{border:1px solid #ccc;padding:8px 12px}
 </table></div><script>
 
 let skuSummary={}
+let orderList=[]
 
 async function processPDF(){
 
@@ -37,12 +38,13 @@ const preview=document.getElementById("preview")
 preview.innerHTML=""
 
 skuSummary={}
+orderList=[]
 
 for(let page=1;page<=pdf.numPages;page++){
 
 const p=await pdf.getPage(page)
 
-const viewport=p.getViewport({scale:1.5})
+const viewport=p.getViewport({scale:1.2})
 
 const canvas=document.createElement("canvas")
 const context=canvas.getContext("2d")
@@ -57,12 +59,16 @@ preview.appendChild(canvas)
 const textContent=await p.getTextContent()
 
 let pageText=""
+textContent.items.forEach(item=>{pageText+=item.str+" "})
 
-textContent.items.forEach(item=>{
-pageText+=item.str+" "
-})
+let sku=findSKU(pageText)
 
-extractSKU(pageText)
+if(!sku) sku="UNKNOWN"
+
+orderList.push(sku)
+
+if(skuSummary[sku]) skuSummary[sku]++
+else skuSummary[sku]=1
 
 }
 
@@ -70,20 +76,19 @@ updateTable()
 
 }
 
-function extractSKU(text){
+function findSKU(text){
 
-const regex=/(Seller\s*SKU|SKU)[:# ]*([A-Za-z0-9._-]+)/gi
+let patterns=[
+/(Seller\s*SKU)[:# ]*([A-Za-z0-9._-]+)/i,
+/(SKU)[:# ]*([A-Za-z0-9._-]+)/i
+]
 
-let match
-
-while((match=regex.exec(text))!==null){
-
-let sku=match[1]
-
-if(skuSummary[sku]) skuSummary[sku]++
-else skuSummary[sku]=1
-
+for(let p of patterns){
+let m=text.match(p)
+if(m) return m[2]
 }
+
+return null
 
 }
 
