@@ -1,174 +1,282 @@
-<!DOCTYPE html><html>
+<!DOCTYPE html>
+<html>
 <head>
 <meta charset="UTF-8">
-<title>Amazon / Flipkart Label & SKU Tool</title><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script><style>
+<title>Labour Attendance Manager</title>
+
+<style>
 body{
 font-family:Arial;
+background:#667eea;
 background:linear-gradient(135deg,#667eea,#764ba2);
-padding:30px;
+margin:0;
+padding:20px;
 }
 
 .card{
 background:white;
 padding:20px;
-border-radius:12px;
-box-shadow:0 10px 25px rgba(0,0,0,0.15);
-max-width:900px;
-margin:auto;
+border-radius:10px;
+margin-bottom:20px;
+box-shadow:0 5px 15px rgba(0,0,0,0.2);
 }
 
-button,input,select{
-padding:10px;
-margin:10px;
+button{
+padding:8px 12px;
+border:none;
+background:#667eea;
+color:white;
+border-radius:6px;
+cursor:pointer;
 }
 
-button{cursor:pointer}
-
-#preview canvas{
-border:1px solid #ccc;
-margin:10px;
-max-width:100%;
+input,select{
+padding:6px;
+margin:3px;
 }
 
 table{
 width:100%;
 border-collapse:collapse;
-margin-top:20px;
 }
 
-th,td{
-border:1px solid #ddd;
-padding:8px;
+td,th{
+padding:6px;
+border-bottom:1px solid #ddd;
+text-align:left;
 }
 
-th{background:#f5f5f5}
+.nav button{
+margin-right:10px;
+}
+</style>
 
-</style></head><body><div class="card"><h2>Amazon / Flipkart Label & SKU Tool</h2><select id="platform">
-<option value="amazon">Amazon</option>
-<option value="flipkart">Flipkart</option>
-</select><br><input type="file" id="pdfUpload" accept="application/pdf"><br><button id="processBtn">Process File</button> <button onclick="downloadCSV()">Download SKU Summary</button>
+</head>
+<body>
 
-<div id="preview"></div><h3>SKU Summary</h3><table id="summaryTable">
-<thead>
+<div class="nav">
+<button onclick="show('add')">Add Labour</button>
+<button onclick="show('today')">Today Attendance</button>
+<button onclick="show('report')">Salary Report</button>
+</div>
+
+<div id="add" class="card">
+
+<h3>Add Labour</h3>
+
+<input id="name" placeholder="Name">
+<input id="rate" placeholder="Hourly Salary">
+<input id="phone" placeholder="Phone">
+
+<select id="type">
+<option value="hourly">Hourly</option>
+<option value="fixed">Fixed Salary</option>
+</select>
+
+<input id="fixedSalary" placeholder="Monthly Salary">
+
+<button onclick="addLabour()">Add</button>
+
+</div>
+
+<div id="today" class="card" style="display:none">
+
+<h3>Today Attendance</h3>
+
+<table id="attendanceTable"></table>
+
+</div>
+
+<div id="report" class="card" style="display:none">
+
+<h3>Salary Report</h3>
+
+<input type="date" id="reportDate">
+
+<button onclick="generateReport()">Generate</button>
+
+<div id="salaryList"></div>
+
+</div>
+
+<script>
+
+let labour=JSON.parse(localStorage.getItem("labour")||"[]")
+let attendance=JSON.parse(localStorage.getItem("attendance")||"[]")
+let advance=JSON.parse(localStorage.getItem("advance")||"[]")
+
+function save(){
+localStorage.setItem("labour",JSON.stringify(labour))
+localStorage.setItem("attendance",JSON.stringify(attendance))
+localStorage.setItem("advance",JSON.stringify(advance))
+}
+
+function show(id){
+
+document.getElementById("add").style.display="none"
+document.getElementById("today").style.display="none"
+document.getElementById("report").style.display="none"
+
+document.getElementById(id).style.display="block"
+
+if(id=="today"){loadAttendance()}
+
+}
+
+function addLabour(){
+
+let l={
+name:name.value,
+rate:rate.value,
+phone:phone.value,
+type:type.value,
+fixedSalary:fixedSalary.value
+}
+
+labour.push(l)
+
+save()
+
+alert("Added")
+
+}
+
+function loadAttendance(){
+
+let table="<tr><th>Name</th><th>Status</th><th>Hours</th><th>Min</th><th>Advance</th></tr>"
+
+let today=new Date().toISOString().slice(0,10)
+
+labour.forEach((l,i)=>{
+
+table+=`
 <tr>
-<th>SKU</th>
-<th>Total Qty</th>
+<td>${l.name}</td>
+<td>
+<select onchange="mark(${i},this.value)">
+<option>P</option>
+<option>A</option>
+</select>
+</td>
+
+<td><input type="number" id="h${i}" style="width:60px"></td>
+
+<td><input type="number" id="m${i}" style="width:60px"></td>
+
+<td><input type="number" id="adv${i}" style="width:80px"></td>
+
 </tr>
-</thead>
-<tbody></tbody>
-</table></div><script>
+`
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+})
 
-let skuTotals = {}
+table+=`</table><button onclick="saveToday()">Save Today</button>`
 
-document.getElementById("processBtn").addEventListener("click", processPDF)
+attendanceTable.innerHTML=table
 
-async function processPDF(){
-
-const fileInput = document.getElementById("pdfUpload")
-
-if(fileInput.files.length === 0){
-alert("Please upload PDF file first")
-return
 }
 
-const file = fileInput.files[0]
+let status={}
 
-skuTotals = {}
+function mark(i,v){
+status[i]=v
+}
 
-document.querySelector("#summaryTable tbody").innerHTML = ""
+function saveToday(){
 
-document.getElementById("preview").innerHTML = "Processing PDF..."
+let today=new Date().toISOString().slice(0,10)
 
-const arrayBuffer = await file.arrayBuffer()
+labour.forEach((l,i)=>{
 
-const pdf = await pdfjsLib.getDocument({data:arrayBuffer}).promise
+let h=document.getElementById("h"+i).value||0
+let m=document.getElementById("m"+i).value||0
+let adv=document.getElementById("adv"+i).value||0
 
-let fullText = ""
+attendance.push({
+name:l.name,
+date:today,
+status:status[i]||"P",
+hours:parseFloat(h),
+min:parseFloat(m)
+})
 
-for(let page=1; page<=pdf.numPages; page++){
+if(adv>0){
 
-const p = await pdf.getPage(page)
-
-const textContent = await p.getTextContent()
-
-textContent.items.forEach(item=>{
-fullText += item.str + " "
+advance.push({
+name:l.name,
+amount:parseFloat(adv)
 })
 
 }
 
-extractData(fullText)
+})
+
+save()
+
+alert("Saved")
 
 }
 
-function extractData(text){
+function generateReport(){
 
-// find all bracket values
+let html=""
 
-let brackets = text.match(/([^()]*)/g)
+labour.forEach(l=>{
 
-if(!brackets){
-alert("No SKU found in brackets")
-return
+let total=0
+
+attendance.forEach(a=>{
+
+if(a.name==l.name && a.status=="P"){
+
+let hrs=a.hours+(a.min/60)
+
+if(l.type=="hourly"){
+
+total+=hrs*l.rate
+
 }
 
-brackets.forEach(b=>{
-
-let sku = b.replace(/[()]/g,"").trim()
-
-// ignore small text inside brackets
-
-if(sku.length < 3) return
-
-if(!skuTotals[sku]) skuTotals[sku] = 0
-
-skuTotals[sku] += 1
+}
 
 })
 
-updateSummary()
+if(l.type=="fixed"){
+total=l.fixedSalary
+}
+
+let adv=0
+
+advance.forEach(v=>{
+if(v.name==l.name){adv+=v.amount}
+})
+
+let final=total-adv
+
+let msg=`Salary ${l.name}
+Total ₹${total}
+Advance ₹${adv}
+Pay ₹${final}`
+
+let wa=`https://wa.me/${l.phone}?text=${encodeURIComponent(msg)}`
+
+html+=`
+<div class="card">
+<b>${l.name}</b><br>
+Total: ₹${total}<br>
+Advance: ₹${adv}<br>
+Final: ₹${final}<br>
+<a href="${wa}" target="_blank">Send WhatsApp</a>
+</div>
+`
+
+})
+
+salaryList.innerHTML=html
 
 }
 
-function updateSummary(){
+</script>
 
-const tbody = document.querySelector("#summaryTable tbody")
-
-for(let sku in skuTotals){
-
-let tr = document.createElement("tr")
-
-tr.innerHTML = `<td>${sku}</td><td>${skuTotals[sku]}</td>`
-
-tbody.appendChild(tr)
-
-}
-
-}
-
-function downloadCSV(){
-
-let csv = "SKU,Qty\n"
-
-for(let sku in skuTotals){
-
-csv += sku + "," + skuTotals[sku] + "\n"
-
-}
-
-const blob = new Blob([csv])
-
-const a = document.createElement("a")
-
-a.href = URL.createObjectURL(blob)
-
-a.download = "sku-summary.csv"
-
-a.click()
-
-}
-
-</script></body>
+</body>
 </html>
