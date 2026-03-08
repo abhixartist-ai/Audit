@@ -55,31 +55,46 @@ margin-right:10px;
 <body>
 
 <div class="nav">
-<button onclick="showPage('labour')">Labour</button>
+<button onclick="showPage('labour')">Employees</button>
 <button onclick="showPage('attendance')">Attendance</button>
-<button onclick="showPage('report')">Report</button>
+<button onclick="showPage('report')">Salary Report</button>
 </div>
 
-<!-- LABOUR MANAGEMENT -->
+
+<!-- EMPLOYEE MANAGEMENT -->
 
 <div id="labour" class="card">
 
-<h3>Labour Management</h3>
+<h3>Employee</h3>
 
 <input id="name" placeholder="Name">
-<input id="rate" type="number" placeholder="Hourly Salary">
+
 <input id="phone" placeholder="Phone">
 
-<select id="type">
+<input id="rate" type="number" placeholder="Hourly Rate">
+
+<input id="fixedSalary" type="number" placeholder="Fixed Salary">
+
+<br>
+
+Salary Mode
+
+<select id="salaryMode">
 <option value="hourly">Hourly</option>
-<option value="fixed">Fixed Salary</option>
+<option value="fixed">Fixed</option>
 </select>
 
-<input id="fixedSalary" placeholder="Monthly Salary">
+Payment Cycle
 
-<button onclick="addLabour()">Add</button>
+<select id="paymentCycle">
+<option value="weekly">Weekly (Saturday)</option>
+<option value="half">15 & Month End</option>
+<option value="month">Month End</option>
+</select>
 
-<table id="labourTable"></table>
+<button onclick="addEmployee()">Add</button>
+
+<table id="empTable"></table>
 
 </div>
 
@@ -89,6 +104,8 @@ margin-right:10px;
 <div id="attendance" class="card" style="display:none">
 
 <h3>Attendance</h3>
+
+Date
 
 <input type="date" id="attDate">
 
@@ -103,11 +120,9 @@ margin-right:10px;
 
 <h3>Salary Report</h3>
 
-From
-<input type="date" id="fromDate">
+From <input type="date" id="fromDate">
 
-To
-<input type="date" id="toDate">
+To <input type="date" id="toDate">
 
 <button onclick="generateReport()">Generate</button>
 
@@ -118,16 +133,18 @@ To
 
 <script>
 
-let labour=JSON.parse(localStorage.getItem("labour")||"[]")
+let employees=JSON.parse(localStorage.getItem("employees")||"[]")
 let attendance=JSON.parse(localStorage.getItem("attendance")||"[]")
 let advance=JSON.parse(localStorage.getItem("advance")||"[]")
 let payments=JSON.parse(localStorage.getItem("payments")||"[]")
 
 function save(){
-localStorage.setItem("labour",JSON.stringify(labour))
+
+localStorage.setItem("employees",JSON.stringify(employees))
 localStorage.setItem("attendance",JSON.stringify(attendance))
 localStorage.setItem("advance",JSON.stringify(advance))
 localStorage.setItem("payments",JSON.stringify(payments))
+
 }
 
 function showPage(p){
@@ -138,56 +155,54 @@ document.getElementById("report").style.display="none"
 
 document.getElementById(p).style.display="block"
 
+if(p=="labour") loadEmployees()
 if(p=="attendance") loadAttendance()
-if(p=="labour") loadLabour()
 
 }
 
-function addLabour(){
+function addEmployee(){
 
-let n=name.value
-
-if(n==""){
-alert("Enter name")
-return
-}
-
-labour.push({
-name:n,
-rate:parseFloat(rate.value||0),
+let emp={
+name:name.value,
 phone:phone.value,
-type:type.value,
-fixedSalary:parseFloat(fixedSalary.value||0)
-})
+rate:parseFloat(rate.value||0),
+fixedSalary:parseFloat(fixedSalary.value||0),
+salaryMode:salaryMode.value,
+paymentCycle:paymentCycle.value
+}
+
+employees.push(emp)
 
 save()
 
 name.value=""
-rate.value=""
 phone.value=""
+rate.value=""
 fixedSalary.value=""
 
-loadLabour()
+loadEmployees()
 
 }
 
-function loadLabour(){
+function loadEmployees(){
 
-let t="<tr><th>Name</th><th>Salary</th><th>Phone</th><th>Action</th></tr>"
+let t="<tr><th>Name</th><th>Mode</th><th>Cycle</th><th>Action</th></tr>"
 
-labour.forEach((l,i)=>{
+employees.forEach((e,i)=>{
 
 t+=`
 
 <tr>
 
-<td>${l.name}</td>
-<td>${l.type=="hourly"?l.rate+"/hr":l.fixedSalary}</td>
-<td>${l.phone}</td>
+<td>${e.name}</td>
+<td>${e.salaryMode}</td>
+<td>${e.paymentCycle}</td>
 
 <td>
-<button onclick="editLabour(${i})">Edit</button>
-<button onclick="deleteLabour(${i})">Delete</button>
+
+<button onclick="editEmp(${i})">Edit</button>
+<button onclick="deleteEmp(${i})">Delete</button>
+
 </td>
 
 </tr>
@@ -196,37 +211,36 @@ t+=`
 
 })
 
-labourTable.innerHTML=t
+empTable.innerHTML=t
 
 }
 
-function editLabour(i){
+function editEmp(i){
 
-let l=labour[i]
+let e=employees[i]
 
-name.value=l.name
-rate.value=l.rate
-phone.value=l.phone
-type.value=l.type
-fixedSalary.value=l.fixedSalary
+name.value=e.name
+phone.value=e.phone
+rate.value=e.rate
+fixedSalary.value=e.fixedSalary
+salaryMode.value=e.salaryMode
+paymentCycle.value=e.paymentCycle
 
-labour.splice(i,1)
+employees.splice(i,1)
 
 save()
-
-loadLabour()
 
 }
 
-function deleteLabour(i){
+function deleteEmp(i){
 
-if(confirm("Delete labour?")){
+if(confirm("Delete employee?")){
 
-labour.splice(i,1)
+employees.splice(i,1)
 
 save()
 
-loadLabour()
+loadEmployees()
 
 }
 
@@ -240,13 +254,13 @@ attDate.value=today
 
 let t="<tr><th>Name</th><th>Status</th><th>Hour</th><th>Min</th><th>Advance</th></tr>"
 
-labour.forEach((l,i)=>{
+employees.forEach((e,i)=>{
 
 t+=`
 
 <tr>
 
-<td>${l.name}</td>
+<td>${e.name}</td>
 
 <td>
 
@@ -257,11 +271,11 @@ t+=`
 
 </td>
 
-<td><input id="h${i}" type="number" value="10" style="width:60px"></td>
+<td><input type="number" id="h${i}" value="10" style="width:60px"></td>
 
-<td><input id="m${i}" type="number" value="0" style="width:60px"></td>
+<td><input type="number" id="m${i}" value="0" style="width:60px"></td>
 
-<td><input id="adv${i}" type="number" style="width:70px"></td>
+<td><input type="number" id="adv${i}" style="width:70px"></td>
 
 </tr>
 
@@ -279,11 +293,11 @@ function saveAttendance(){
 
 let d=attDate.value
 
-labour.forEach((l,i)=>{
+employees.forEach((e,i)=>{
 
 attendance.push({
 
-name:l.name,
+name:e.name,
 date:d,
 status:document.getElementById("s"+i).value,
 hours:parseFloat(document.getElementById("h"+i).value||0),
@@ -296,9 +310,11 @@ let adv=document.getElementById("adv"+i).value
 if(adv>0){
 
 advance.push({
-name:l.name,
+
+name:e.name,
 amount:parseFloat(adv),
 date:d
+
 })
 
 }
@@ -318,65 +334,77 @@ let to=toDate.value
 
 let html=""
 
-labour.forEach(l=>{
+employees.forEach(e=>{
 
 let total=0
+let totalHours=0
 
 attendance.forEach(a=>{
 
-if(a.name==l.name && a.date>=from && a.date<=to && a.status=="P"){
+if(a.name==e.name && a.date>=from && a.date<=to && a.status=="P"){
 
 let hrs=a.hours+(a.min/60)
 
-if(l.type=="hourly"){
-total+=hrs*l.rate
+totalHours+=hrs
+
+if(e.salaryMode=="hourly"){
+total+=hrs*e.rate
 }
 
 }
 
 })
 
-if(l.type=="fixed"){
-total=l.fixedSalary
+if(e.salaryMode=="fixed"){
+total=e.fixedSalary
 }
 
 let adv=0
 
 advance.forEach(v=>{
-if(v.name==l.name && v.date<=to){
+if(v.name==e.name && v.date<=to){
 adv+=v.amount
 }
 })
 
 let final=total-adv
 
-let paid=payments.find(p=>p.name==l.name && p.from==from && p.to==to)
+let paid=payments.find(p=>p.name==e.name && p.from==from && p.to==to)
 
 let status=paid?"PAID":"UNPAID"
 
-let msg=`Salary ${l.name}
-From ${from} To ${to}
+let msg=`Salary ${e.name}
+${from} to ${to}
+Hours ${totalHours}
 Total ₹${total}
 Advance ₹${adv}
 Pay ₹${final}`
 
-let wa=`https://wa.me/${l.phone}?text=${encodeURIComponent(msg)}`
+let wa=`https://wa.me/${e.phone}?text=${encodeURIComponent(msg)}`
 
 html+=`
 
 <div class="card">
 
-<b>${l.name}</b><br>
+<b>${e.name}</b><br>
+
+Cycle: ${e.paymentCycle}<br>
+
+Mode: ${e.salaryMode}<br>
+
+Hours: ${totalHours}<br>
 
 Total ₹${total}<br>
+
 Advance ₹${adv}<br>
+
 Final ₹${final}<br>
 
 Status: ${status}
 
 <br><br>
 
-<button onclick="markPaid('${l.name}','${from}','${to}')">Mark Paid</button>
+<button onclick="markPaid('${e.name}','${from}','${to}')">Mark Paid</button>
 
 <a href="${wa}" target="_blank">WhatsApp</a>
 
@@ -393,9 +421,11 @@ reportList.innerHTML=html
 function markPaid(name,from,to){
 
 payments.push({
+
 name:name,
 from:from,
 to:to
+
 })
 
 save()
@@ -404,7 +434,7 @@ alert("Marked Paid")
 
 }
 
-loadLabour()
+loadEmployees()
 
 </script>
 
