@@ -3,98 +3,119 @@
 <head>
 <meta charset="UTF-8">
 <title>Labour Attendance Manager</title>
+
 <style>
+
 body{
 font-family:Arial;
 background:linear-gradient(135deg,#667eea,#764ba2);
-margin:0;
-color:#333;
+padding:20px;
 }
-.container{
+
+.card{
 background:white;
-margin:15px;
-padding:15px;
+padding:20px;
 border-radius:10px;
+margin-bottom:20px;
 box-shadow:0 5px 15px rgba(0,0,0,0.2);
 }
-h2{margin-top:0}
-input,select,button{
-padding:8px;
-margin:5px 0;
-width:100%;
-}
+
 button{
+padding:8px 14px;
 background:#667eea;
 color:white;
 border:none;
-border-radius:5px;
+border-radius:6px;
+cursor:pointer;
 }
+
+input,select{
+padding:6px;
+margin:4px;
+}
+
 table{
 width:100%;
 border-collapse:collapse;
 }
+
 td,th{
-border-bottom:1px solid #ddd;
 padding:8px;
+border-bottom:1px solid #ddd;
 }
-.nav{
-display:flex;
-background:#333;
-}
+
 .nav button{
-flex:1;
-border-radius:0;
-background:#333;
+margin-right:10px;
 }
+
 </style>
 </head>
 
 <body>
 
 <div class="nav">
-<button onclick="show('today')">Today</button>
-<button onclick="show('add')">Add Labour</button>
-<button onclick="show('report')">Report</button>
+<button onclick="showPage('add')">Add Labour</button>
+<button onclick="showPage('attendance')">Attendance</button>
+<button onclick="showPage('report')">Salary Report</button>
 </div>
 
-<!-- Add Labour -->
-<div id="add" class="container" style="display:none">
-<h2>Add Labour</h2>
+
+<!-- ADD EMPLOYEE -->
+
+<div id="add" class="card">
+
+<h3>Add Labour</h3>
 
 <input id="name" placeholder="Name">
-<input id="salary" placeholder="Hourly Salary">
-<input id="contact" placeholder="WhatsApp Number">
+
+<input id="rate" type="number" placeholder="Hourly Salary">
+
+<input id="phone" placeholder="Phone">
 
 <select id="type">
-<option value="hourly">Hourly Salary</option>
+<option value="hourly">Hourly</option>
 <option value="fixed">Fixed Salary</option>
 </select>
 
+<input id="fixedSalary" type="number" placeholder="Monthly Salary">
+
+<br><br>
+
 <button onclick="addLabour()">Add Labour</button>
-</div>
-
-<!-- Today Attendance -->
-<div id="today" class="container">
-<h2>Today Attendance</h2>
-
-<input type="date" id="date">
-
-<div id="list"></div>
 
 </div>
 
-<!-- Report -->
-<div id="report" class="container" style="display:none">
 
-<h2>Salary Report</h2>
+<!-- ATTENDANCE -->
 
-<input type="month" id="month">
+<div id="attendance" class="card" style="display:none">
 
-<button onclick="generateReport()">Calculate</button>
+<h3>Attendance</h3>
 
-<div id="salaryReport"></div>
+<label>Date :</label>
+
+<input type="date" id="attDate">
+
+<br><br>
+
+<table id="attendanceTable"></table>
 
 </div>
+
+
+
+<!-- REPORT -->
+
+<div id="report" class="card" style="display:none">
+
+<h3>Salary Report</h3>
+
+<button onclick="generateReport()">Generate</button>
+
+<div id="salaryList"></div>
+
+</div>
+
 
 <script>
 
@@ -102,175 +123,229 @@ let labour=JSON.parse(localStorage.getItem("labour")||"[]")
 let attendance=JSON.parse(localStorage.getItem("attendance")||"[]")
 let advance=JSON.parse(localStorage.getItem("advance")||"[]")
 
-document.getElementById("date").valueAsDate=new Date()
+function saveData(){
 
-function save(){
 localStorage.setItem("labour",JSON.stringify(labour))
 localStorage.setItem("attendance",JSON.stringify(attendance))
 localStorage.setItem("advance",JSON.stringify(advance))
+
 }
 
-function show(x){
-document.getElementById("today").style.display="none"
+
+function showPage(p){
+
 document.getElementById("add").style.display="none"
+document.getElementById("attendance").style.display="none"
 document.getElementById("report").style.display="none"
 
-document.getElementById(x).style.display="block"
+document.getElementById(p).style.display="block"
 
-if(x=="today")loadToday()
+if(p=="attendance"){loadAttendance()}
+
 }
+
 
 function addLabour(){
 
-let l={
-name:name.value,
-salary:Number(salary.value),
-contact:contact.value,
-type:type.value
+let n=document.getElementById("name").value
+let r=document.getElementById("rate").value
+let ph=document.getElementById("phone").value
+let t=document.getElementById("type").value
+let fs=document.getElementById("fixedSalary").value
+
+if(n==""){
+alert("Enter Name")
+return
 }
 
-labour.push(l)
+labour.push({
+name:n,
+rate:parseFloat(r||0),
+phone:ph,
+type:t,
+fixedSalary:parseFloat(fs||0)
+})
 
-save()
+saveData()
 
 alert("Labour Added")
 
-loadToday()
+document.getElementById("name").value=""
+document.getElementById("rate").value=""
+document.getElementById("phone").value=""
+document.getElementById("fixedSalary").value=""
 
 }
 
-function loadToday(){
 
-let d=document.getElementById("date").value
 
-let html="<table><tr><th>Name</th><th>Status</th><th>Hours</th><th>Advance</th></tr>"
+function loadAttendance(){
+
+let today=new Date().toISOString().slice(0,10)
+
+document.getElementById("attDate").value=today
+
+let table="<tr><th>Name</th><th>Status</th><th>Hours</th><th>Min</th><th>Advance</th></tr>"
 
 labour.forEach((l,i)=>{
 
-html+=`
+table+=`
+
 <tr>
+
 <td>${l.name}</td>
 
 <td>
-<select onchange="setStatus(${i},this.value)">
-<option value="">-</option>
-<option>Present</option>
-<option>Absent</option>
+
+<select id="s${i}">
+<option value="P">Present</option>
+<option value="A">Absent</option>
 </select>
+
 </td>
 
 <td>
-<input type="number" placeholder="Hours" onchange="setHour(${i},this.value)">
+
+<input type="number" id="h${i}" value="10" style="width:60px">
+
 </td>
 
 <td>
-<input type="number" placeholder="Advance" onchange="setAdvance(${i},this.value)">
+
+<input type="number" id="m${i}" value="0" style="width:60px">
+
+</td>
+
+<td>
+
+<input type="number" id="adv${i}" style="width:80px">
+
 </td>
 
 </tr>
+
 `
 
 })
 
-html+="</table>"
+table+=`</table><br><button onclick="saveAttendance()">Save Attendance</button>`
 
-document.getElementById("list").innerHTML=html
+document.getElementById("attendanceTable").innerHTML=table
 
 }
 
-function setStatus(i,val){
+
+
+function saveAttendance(){
+
+let d=document.getElementById("attDate").value
+
+labour.forEach((l,i)=>{
+
+let s=document.getElementById("s"+i).value
+let h=document.getElementById("h"+i).value
+let m=document.getElementById("m"+i).value
+let adv=document.getElementById("adv"+i).value
 
 attendance.push({
-name:labour[i].name,
-date:date.value,
-status:val,
-hours:0
+
+name:l.name,
+date:d,
+status:s,
+hours:parseFloat(h||0),
+min:parseFloat(m||0)
+
 })
 
-save()
-
-}
-
-function setHour(i,val){
-
-attendance.push({
-name:labour[i].name,
-date:date.value,
-status:"Present",
-hours:Number(val)
-})
-
-save()
-
-}
-
-function setAdvance(i,val){
+if(adv>0){
 
 advance.push({
-name:labour[i].name,
-amount:Number(val),
-date:date.value
+
+name:l.name,
+amount:parseFloat(adv)
+
 })
 
-save()
+}
+
+})
+
+saveData()
+
+alert("Attendance Saved")
 
 }
+
+
 
 function generateReport(){
 
-let m=document.getElementById("month").value
-
-let html="<table><tr><th>Name</th><th>Salary</th><th>Advance</th><th>Total</th><th>Send</th></tr>"
+let html=""
 
 labour.forEach(l=>{
 
-let hours=0
+let total=0
 
 attendance.forEach(a=>{
-if(a.name==l.name && a.date.startsWith(m)){
-hours+=a.hours
+
+if(a.name==l.name && a.status=="P"){
+
+let hrs=a.hours+(a.min/60)
+
+if(l.type=="hourly"){
+
+total+=hrs*l.rate
+
 }
+
+}
+
 })
 
-let sal=l.type=="fixed"?l.salary:(hours*l.salary)
+if(l.type=="fixed"){
+total=l.fixedSalary
+}
 
 let adv=0
 
-advance.forEach(a=>{
-if(a.name==l.name){
-adv+=a.amount
+advance.forEach(v=>{
+
+if(v.name==l.name){
+adv+=v.amount
 }
+
 })
 
-let total=sal-adv
+let final=total-adv
 
-let msg=`Salary report
-Name: ${l.name}
-Salary: ${sal}
-Advance: ${adv}
-Total: ${total}`
+let msg=`Salary ${l.name}
+Total ₹${total}
+Advance ₹${adv}
+Pay ₹${final}`
 
-let link=`https://wa.me/${l.contact}?text=`+encodeURIComponent(msg)
+let wa=`https://wa.me/${l.phone}?text=${encodeURIComponent(msg)}`
 
 html+=`
-<tr>
-<td>${l.name}</td>
-<td>${sal}</td>
-<td>${adv}</td>
-<td>${total}</td>
-<td><a href="${link}" target="_blank">WhatsApp</a></td>
-</tr>
+
+<div class="card">
+
+<b>${l.name}</b><br>
+
+Total ₹${total}<br>
+Advance ₹${adv}<br>
+Final ₹${final}<br><br>
+
+<a href="${wa}" target="_blank">Send WhatsApp</a>
+
+</div>
+
 `
 
 })
 
-html+="</table>"
-
-salaryReport.innerHTML=html
+document.getElementById("salaryList").innerHTML=html
 
 }
-
-loadToday()
 
 </script>
 
