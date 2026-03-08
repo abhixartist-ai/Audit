@@ -1,38 +1,45 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
-<title>Labour Payroll Manager</title>
+<title>Employee Attendance System</title>
 
 <style>
 
 body{
 font-family:Arial;
-background:linear-gradient(135deg,#667eea,#764ba2);
+background:#f4f6fb;
+margin:0;
+}
+
+header{
+background:linear-gradient(90deg,#667eea,#764ba2);
+color:white;
+padding:15px;
+font-size:22px;
+}
+
+nav{
+background:white;
+padding:10px;
+box-shadow:0 2px 5px rgba(0,0,0,0.1);
+}
+
+button{
+padding:8px 14px;
+margin:4px;
+cursor:pointer;
+}
+
+.container{
 padding:20px;
 }
 
 .card{
 background:white;
-padding:20px;
-border-radius:12px;
-margin-bottom:20px;
-box-shadow:0 6px 15px rgba(0,0,0,0.2);
-}
-
-button{
-padding:7px 12px;
-background:#667eea;
-border:none;
-color:white;
+padding:15px;
 border-radius:6px;
-cursor:pointer;
-margin:2px;
-}
-
-input,select{
-padding:6px;
-margin:3px;
+box-shadow:0 3px 10px rgba(0,0,0,0.1);
+margin-bottom:20px;
 }
 
 table{
@@ -40,145 +47,175 @@ width:100%;
 border-collapse:collapse;
 }
 
-td,th{
+table th,table td{
+border:1px solid #ddd;
 padding:8px;
-border-bottom:1px solid #ddd;
 }
 
-.nav button{
-margin-right:10px;
+input,select{
+padding:6px;
+width:100%;
+}
+
+.hidden{
+display:none;
 }
 
 </style>
+
 </head>
 
 <body>
 
-<div class="nav">
-<button onclick="showPage('labour')">Employees</button>
-<button onclick="showPage('attendance')">Attendance</button>
-<button onclick="showPage('report')">Salary Report</button>
-</div>
+<header>Employee Attendance System</header>
 
+<nav>
+<button onclick="showScreen('employee')">Employee</button>
+<button onclick="showScreen('attendance')">Attendance</button>
+<button onclick="showScreen('report')">Report</button>
+</nav>
 
-<!-- EMPLOYEE MANAGEMENT -->
+<div class="container">
 
-<div id="labour" class="card">
+<!-- Employee Screen -->
 
-<h3>Employee</h3>
+<div id="employee" class="card">
 
-<input id="name" placeholder="Name">
+<h3>Add Employee</h3>
 
-<input id="phone" placeholder="Phone">
-
-<input id="rate" type="number" placeholder="Hourly Rate">
-
-<input id="fixedSalary" type="number" placeholder="Fixed Salary">
-
-<br>
-
-Salary Mode
+<input id="empName" placeholder="Name"><br><br>
+<input id="empPhone" placeholder="Mobile"><br><br>
 
 <select id="salaryMode">
-<option value="hourly">Hourly</option>
-<option value="fixed">Fixed</option>
-</select>
+<option>Weekly</option>
+<option>15+MonthEnd</option>
+<option>MonthEnd</option>
+</select><br><br>
 
-Payment Cycle
+<select id="paymentType">
+<option>Hourly</option>
+<option>Fixed</option>
+</select><br><br>
 
-<select id="paymentCycle">
-<option value="weekly">Weekly (Saturday)</option>
-<option value="half">15 & Month End</option>
-<option value="month">Month End</option>
-</select>
+<input id="hourRate" placeholder="Hour Rate"><br><br>
+<input id="fixedSalary" placeholder="Fixed Salary"><br><br>
 
-<button onclick="addEmployee()">Add</button>
+<button onclick="addEmployee()">Add Employee</button>
 
-<table id="empTable"></table>
+<h3>Employee List</h3>
+
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Mode</th>
+<th>Action</th>
+</tr>
+</thead>
+
+<tbody id="empTable"></tbody>
+
+</table>
 
 </div>
 
+<!-- Attendance Screen -->
 
-<!-- ATTENDANCE -->
-
-<div id="attendance" class="card" style="display:none">
+<div id="attendance" class="card hidden">
 
 <h3>Attendance</h3>
 
-Date
+<input type="date" id="attDate"><br><br>
 
-<input type="date" id="attDate">
+<select id="attEmp"></select><br><br>
 
-<table id="attendanceTable"></table>
+<input id="status" placeholder="A / P"><br><br>
+
+<input id="hours" placeholder="Hours (Default 10)"><br><br>
+
+<input id="remark" placeholder="Remark"><br><br>
+
+<button onclick="saveAttendance()">Save Attendance</button>
 
 </div>
 
+<!-- Report Screen -->
 
-<!-- REPORT -->
+<div id="report" class="card hidden">
 
-<div id="report" class="card" style="display:none">
+<h3>Report</h3>
 
-<h3>Salary Report</h3>
-
-From <input type="date" id="fromDate">
-
-To <input type="date" id="toDate">
+<select id="repEmp"></select>
 
 <button onclick="generateReport()">Generate</button>
 
-<div id="reportList"></div>
+<table>
+<thead>
+<tr>
+<th>Date</th>
+<th>Hours</th>
+</tr>
+</thead>
+
+<tbody id="reportTable"></tbody>
+
+</table>
+
+<br>
+
+<b>Total Hours:</b> <span id="totalHours"></span><br>
+<b>Total Salary:</b> <span id="totalSalary"></span>
 
 </div>
 
+</div>
 
 <script>
 
 let employees=JSON.parse(localStorage.getItem("employees")||"[]")
 let attendance=JSON.parse(localStorage.getItem("attendance")||"[]")
-let advance=JSON.parse(localStorage.getItem("advance")||"[]")
-let payments=JSON.parse(localStorage.getItem("payments")||"[]")
 
-function save(){
-
+function saveData(){
 localStorage.setItem("employees",JSON.stringify(employees))
 localStorage.setItem("attendance",JSON.stringify(attendance))
-localStorage.setItem("advance",JSON.stringify(advance))
-localStorage.setItem("payments",JSON.stringify(payments))
-
 }
 
-function showPage(p){
+function showScreen(id){
 
-document.getElementById("labour").style.display="none"
-document.getElementById("attendance").style.display="none"
-document.getElementById("report").style.display="none"
+document.getElementById("employee").classList.add("hidden")
+document.getElementById("attendance").classList.add("hidden")
+document.getElementById("report").classList.add("hidden")
 
-document.getElementById(p).style.display="block"
-
-if(p=="labour") loadEmployees()
-if(p=="attendance") loadAttendance()
+document.getElementById(id).classList.remove("hidden")
 
 }
 
 function addEmployee(){
 
 let emp={
-name:name.value,
-phone:phone.value,
-rate:parseFloat(rate.value||0),
-fixedSalary:parseFloat(fixedSalary.value||0),
-salaryMode:salaryMode.value,
-paymentCycle:paymentCycle.value
+id:Date.now(),
+name:empName.value,
+phone:empPhone.value,
+mode:salaryMode.value,
+type:paymentType.value,
+rate:Number(hourRate.value),
+salary:Number(fixedSalary.value)
 }
 
 employees.push(emp)
 
-save()
+saveData()
 
-name.value=""
-phone.value=""
-rate.value=""
-fixedSalary.value=""
+loadEmployees()
+
+}
+
+function deleteEmp(id){
+
+employees=employees.filter(e=>e.id!=id)
+
+saveData()
 
 loadEmployees()
 
@@ -186,142 +223,55 @@ loadEmployees()
 
 function loadEmployees(){
 
-let t="<tr><th>Name</th><th>Mode</th><th>Cycle</th><th>Action</th></tr>"
+let html=""
 
-employees.forEach((e,i)=>{
+employees.forEach(e=>{
 
-t+=`
-
+html+=`
 <tr>
-
 <td>${e.name}</td>
-<td>${e.salaryMode}</td>
-<td>${e.paymentCycle}</td>
-
-<td>
-
-<button onclick="editEmp(${i})">Edit</button>
-<button onclick="deleteEmp(${i})">Delete</button>
-
-</td>
-
+<td>${e.type}</td>
+<td>${e.mode}</td>
+<td><button onclick="deleteEmp(${e.id})">Delete</button></td>
 </tr>
-
 `
 
 })
 
-empTable.innerHTML=t
+empTable.innerHTML=html
 
-}
+let options=""
 
-function editEmp(i){
+employees.forEach(e=>{
 
-let e=employees[i]
-
-name.value=e.name
-phone.value=e.phone
-rate.value=e.rate
-fixedSalary.value=e.fixedSalary
-salaryMode.value=e.salaryMode
-paymentCycle.value=e.paymentCycle
-
-employees.splice(i,1)
-
-save()
-
-}
-
-function deleteEmp(i){
-
-if(confirm("Delete employee?")){
-
-employees.splice(i,1)
-
-save()
-
-loadEmployees()
-
-}
-
-}
-
-function loadAttendance(){
-
-let today=new Date().toISOString().slice(0,10)
-
-attDate.value=today
-
-let t="<tr><th>Name</th><th>Status</th><th>Hour</th><th>Min</th><th>Advance</th></tr>"
-
-employees.forEach((e,i)=>{
-
-t+=`
-
-<tr>
-
-<td>${e.name}</td>
-
-<td>
-
-<select id="s${i}">
-<option value="P">Present</option>
-<option value="A">Absent</option>
-</select>
-
-</td>
-
-<td><input type="number" id="h${i}" value="10" style="width:60px"></td>
-
-<td><input type="number" id="m${i}" value="0" style="width:60px"></td>
-
-<td><input type="number" id="adv${i}" style="width:70px"></td>
-
-</tr>
-
-`
+options+=`<option value="${e.id}">${e.name}</option>`
 
 })
 
-t+=`</table><button onclick="saveAttendance()">Save</button>`
-
-attendanceTable.innerHTML=t
+attEmp.innerHTML=options
+repEmp.innerHTML=options
 
 }
 
 function saveAttendance(){
 
-let d=attDate.value
+let st=status.value.toUpperCase()
 
-employees.forEach((e,i)=>{
+let hr=hours.value
+
+if(st=="P" && hr=="") hr=10
+if(st=="A") hr=0
 
 attendance.push({
 
-name:e.name,
-date:d,
-status:document.getElementById("s"+i).value,
-hours:parseFloat(document.getElementById("h"+i).value||0),
-min:parseFloat(document.getElementById("m"+i).value||0)
+date:attDate.value,
+emp:attEmp.value,
+hours:Number(hr),
+remark:remark.value
 
 })
 
-let adv=document.getElementById("adv"+i).value
-
-if(adv>0){
-
-advance.push({
-
-name:e.name,
-amount:parseFloat(adv),
-date:d
-
-})
-
-}
-
-})
-
-save()
+saveData()
 
 alert("Saved")
 
@@ -329,114 +279,50 @@ alert("Saved")
 
 function generateReport(){
 
-let from=fromDate.value
-let to=toDate.value
+let id=repEmp.value
+
+let emp=employees.find(e=>e.id==id)
+
+let data=attendance.filter(a=>a.emp==id)
 
 let html=""
 
-employees.forEach(e=>{
-
 let total=0
-let totalHours=0
 
-attendance.forEach(a=>{
-
-if(a.name==e.name && a.date>=from && a.date<=to && a.status=="P"){
-
-let hrs=a.hours+(a.min/60)
-
-totalHours+=hrs
-
-if(e.salaryMode=="hourly"){
-total+=hrs*e.rate
-}
-
-}
-
-})
-
-if(e.salaryMode=="fixed"){
-total=e.fixedSalary
-}
-
-let adv=0
-
-advance.forEach(v=>{
-if(v.name==e.name && v.date<=to){
-adv+=v.amount
-}
-})
-
-let final=total-adv
-
-let paid=payments.find(p=>p.name==e.name && p.from==from && p.to==to)
-
-let status=paid?"PAID":"UNPAID"
-
-let msg=`Salary ${e.name}
-${from} to ${to}
-Hours ${totalHours}
-Total ₹${total}
-Advance ₹${adv}
-Pay ₹${final}`
-
-let wa=`https://wa.me/${e.phone}?text=${encodeURIComponent(msg)}`
+data.forEach(d=>{
 
 html+=`
-
-<div class="card">
-
-<b>${e.name}</b><br>
-
-Cycle: ${e.paymentCycle}<br>
-
-Mode: ${e.salaryMode}<br>
-
-Hours: ${totalHours}<br>
-
-Total ₹${total}<br>
-
-Advance ₹${adv}<br>
-
-Final ₹${final}<br>
-
-Status: ${status}
-
-<br><br>
-
-<button onclick="markPaid('${e.name}','${from}','${to}')">Mark Paid</button>
-
-<a href="${wa}" target="_blank">WhatsApp</a>
-
-</div>
-
+<tr>
+<td>${d.date}</td>
+<td>${d.hours}</td>
+</tr>
 `
 
-})
-
-reportList.innerHTML=html
-
-}
-
-function markPaid(name,from,to){
-
-payments.push({
-
-name:name,
-from:from,
-to:to
+total+=d.hours
 
 })
 
-save()
+reportTable.innerHTML=html
 
-alert("Marked Paid")
+totalHours.innerText=total
+
+let salary=0
+
+if(emp.type=="Hourly")
+salary=total*emp.rate
+else
+salary=emp.salary
+
+totalSalary.innerText=salary
 
 }
 
 loadEmployees()
 
+attDate.valueAsDate=new Date()
+
 </script>
 
 </body>
+
 </html>
