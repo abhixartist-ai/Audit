@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Labour Attendance Manager</title>
+<title>Labour Payroll Manager</title>
 
 <style>
 
@@ -15,23 +15,24 @@ padding:20px;
 .card{
 background:white;
 padding:20px;
-border-radius:10px;
+border-radius:12px;
 margin-bottom:20px;
-box-shadow:0 5px 15px rgba(0,0,0,0.2);
+box-shadow:0 6px 15px rgba(0,0,0,0.2);
 }
 
 button{
-padding:8px 14px;
+padding:7px 12px;
 background:#667eea;
-color:white;
 border:none;
+color:white;
 border-radius:6px;
 cursor:pointer;
+margin:2px;
 }
 
 input,select{
 padding:6px;
-margin:4px;
+margin:3px;
 }
 
 table{
@@ -54,22 +55,19 @@ margin-right:10px;
 <body>
 
 <div class="nav">
-<button onclick="showPage('add')">Add Labour</button>
+<button onclick="showPage('labour')">Labour</button>
 <button onclick="showPage('attendance')">Attendance</button>
-<button onclick="showPage('report')">Salary Report</button>
+<button onclick="showPage('report')">Report</button>
 </div>
 
+<!-- LABOUR MANAGEMENT -->
 
-<!-- ADD EMPLOYEE -->
+<div id="labour" class="card">
 
-<div id="add" class="card">
-
-<h3>Add Labour</h3>
+<h3>Labour Management</h3>
 
 <input id="name" placeholder="Name">
-
 <input id="rate" type="number" placeholder="Hourly Salary">
-
 <input id="phone" placeholder="Phone">
 
 <select id="type">
@@ -77,11 +75,11 @@ margin-right:10px;
 <option value="fixed">Fixed Salary</option>
 </select>
 
-<input id="fixedSalary" type="number" placeholder="Monthly Salary">
+<input id="fixedSalary" placeholder="Monthly Salary">
 
-<br><br>
+<button onclick="addLabour()">Add</button>
 
-<button onclick="addLabour()">Add Labour</button>
+<table id="labourTable"></table>
 
 </div>
 
@@ -92,16 +90,11 @@ margin-right:10px;
 
 <h3>Attendance</h3>
 
-<label>Date :</label>
-
 <input type="date" id="attDate">
-
-<br><br>
 
 <table id="attendanceTable"></table>
 
 </div>
-
 
 
 <!-- REPORT -->
@@ -110,9 +103,15 @@ margin-right:10px;
 
 <h3>Salary Report</h3>
 
+From
+<input type="date" id="fromDate">
+
+To
+<input type="date" id="toDate">
+
 <button onclick="generateReport()">Generate</button>
 
-<div id="salaryList"></div>
+<div id="reportList"></div>
 
 </div>
 
@@ -122,74 +121,128 @@ margin-right:10px;
 let labour=JSON.parse(localStorage.getItem("labour")||"[]")
 let attendance=JSON.parse(localStorage.getItem("attendance")||"[]")
 let advance=JSON.parse(localStorage.getItem("advance")||"[]")
+let payments=JSON.parse(localStorage.getItem("payments")||"[]")
 
-function saveData(){
-
+function save(){
 localStorage.setItem("labour",JSON.stringify(labour))
 localStorage.setItem("attendance",JSON.stringify(attendance))
 localStorage.setItem("advance",JSON.stringify(advance))
-
+localStorage.setItem("payments",JSON.stringify(payments))
 }
-
 
 function showPage(p){
 
-document.getElementById("add").style.display="none"
+document.getElementById("labour").style.display="none"
 document.getElementById("attendance").style.display="none"
 document.getElementById("report").style.display="none"
 
 document.getElementById(p).style.display="block"
 
-if(p=="attendance"){loadAttendance()}
+if(p=="attendance") loadAttendance()
+if(p=="labour") loadLabour()
 
 }
 
-
 function addLabour(){
 
-let n=document.getElementById("name").value
-let r=document.getElementById("rate").value
-let ph=document.getElementById("phone").value
-let t=document.getElementById("type").value
-let fs=document.getElementById("fixedSalary").value
+let n=name.value
 
 if(n==""){
-alert("Enter Name")
+alert("Enter name")
 return
 }
 
 labour.push({
 name:n,
-rate:parseFloat(r||0),
-phone:ph,
-type:t,
-fixedSalary:parseFloat(fs||0)
+rate:parseFloat(rate.value||0),
+phone:phone.value,
+type:type.value,
+fixedSalary:parseFloat(fixedSalary.value||0)
 })
 
-saveData()
+save()
 
-alert("Labour Added")
+name.value=""
+rate.value=""
+phone.value=""
+fixedSalary.value=""
 
-document.getElementById("name").value=""
-document.getElementById("rate").value=""
-document.getElementById("phone").value=""
-document.getElementById("fixedSalary").value=""
+loadLabour()
 
 }
 
+function loadLabour(){
 
+let t="<tr><th>Name</th><th>Salary</th><th>Phone</th><th>Action</th></tr>"
+
+labour.forEach((l,i)=>{
+
+t+=`
+
+<tr>
+
+<td>${l.name}</td>
+<td>${l.type=="hourly"?l.rate+"/hr":l.fixedSalary}</td>
+<td>${l.phone}</td>
+
+<td>
+<button onclick="editLabour(${i})">Edit</button>
+<button onclick="deleteLabour(${i})">Delete</button>
+</td>
+
+</tr>
+
+`
+
+})
+
+labourTable.innerHTML=t
+
+}
+
+function editLabour(i){
+
+let l=labour[i]
+
+name.value=l.name
+rate.value=l.rate
+phone.value=l.phone
+type.value=l.type
+fixedSalary.value=l.fixedSalary
+
+labour.splice(i,1)
+
+save()
+
+loadLabour()
+
+}
+
+function deleteLabour(i){
+
+if(confirm("Delete labour?")){
+
+labour.splice(i,1)
+
+save()
+
+loadLabour()
+
+}
+
+}
 
 function loadAttendance(){
 
 let today=new Date().toISOString().slice(0,10)
 
-document.getElementById("attDate").value=today
+attDate.value=today
 
-let table="<tr><th>Name</th><th>Status</th><th>Hours</th><th>Min</th><th>Advance</th></tr>"
+let t="<tr><th>Name</th><th>Status</th><th>Hour</th><th>Min</th><th>Advance</th></tr>"
 
 labour.forEach((l,i)=>{
 
-table+=`
+t+=`
 
 <tr>
 
@@ -204,23 +257,11 @@ table+=`
 
 </td>
 
-<td>
+<td><input id="h${i}" type="number" value="10" style="width:60px"></td>
 
-<input type="number" id="h${i}" value="10" style="width:60px">
+<td><input id="m${i}" type="number" value="0" style="width:60px"></td>
 
-</td>
-
-<td>
-
-<input type="number" id="m${i}" value="0" style="width:60px">
-
-</td>
-
-<td>
-
-<input type="number" id="adv${i}" style="width:80px">
-
-</td>
+<td><input id="adv${i}" type="number" style="width:70px"></td>
 
 </tr>
 
@@ -228,57 +269,52 @@ table+=`
 
 })
 
-table+=`</table><br><button onclick="saveAttendance()">Save Attendance</button>`
+t+=`</table><button onclick="saveAttendance()">Save</button>`
 
-document.getElementById("attendanceTable").innerHTML=table
+attendanceTable.innerHTML=t
 
 }
 
-
-
 function saveAttendance(){
 
-let d=document.getElementById("attDate").value
+let d=attDate.value
 
 labour.forEach((l,i)=>{
-
-let s=document.getElementById("s"+i).value
-let h=document.getElementById("h"+i).value
-let m=document.getElementById("m"+i).value
-let adv=document.getElementById("adv"+i).value
 
 attendance.push({
 
 name:l.name,
 date:d,
-status:s,
-hours:parseFloat(h||0),
-min:parseFloat(m||0)
+status:document.getElementById("s"+i).value,
+hours:parseFloat(document.getElementById("h"+i).value||0),
+min:parseFloat(document.getElementById("m"+i).value||0)
 
 })
+
+let adv=document.getElementById("adv"+i).value
 
 if(adv>0){
 
 advance.push({
-
 name:l.name,
-amount:parseFloat(adv)
-
+amount:parseFloat(adv),
+date:d
 })
 
 }
 
 })
 
-saveData()
+save()
 
-alert("Attendance Saved")
+alert("Saved")
 
 }
-
-
 
 function generateReport(){
+
+let from=fromDate.value
+let to=toDate.value
 
 let html=""
 
@@ -288,14 +324,12 @@ let total=0
 
 attendance.forEach(a=>{
 
-if(a.name==l.name && a.status=="P"){
+if(a.name==l.name && a.date>=from && a.date<=to && a.status=="P"){
 
 let hrs=a.hours+(a.min/60)
 
 if(l.type=="hourly"){
-
 total+=hrs*l.rate
-
 }
 
 }
@@ -309,16 +343,19 @@ total=l.fixedSalary
 let adv=0
 
 advance.forEach(v=>{
-
-if(v.name==l.name){
+if(v.name==l.name && v.date<=to){
 adv+=v.amount
 }
-
 })
 
 let final=total-adv
 
+let paid=payments.find(p=>p.name==l.name && p.from==from && p.to==to)
+
+let status=paid?"PAID":"UNPAID"
+
 let msg=`Salary ${l.name}
+From ${from} To ${to}
 Total ₹${total}
 Advance ₹${adv}
 Pay ₹${final}`
@@ -333,9 +370,15 @@ html+=`
 
 Total ₹${total}<br>
 Advance ₹${adv}<br>
-Final ₹${final}<br><br>
+Final ₹${final}<br>
 
-<a href="${wa}" target="_blank">Send WhatsApp</a>
+Status: ${status}
+
+<br><br>
+
+<button onclick="markPaid('${l.name}','${from}','${to}')">Mark Paid</button>
+
+<a href="${wa}" target="_blank">WhatsApp</a>
 
 </div>
 
@@ -343,9 +386,25 @@ Final ₹${final}<br><br>
 
 })
 
-document.getElementById("salaryList").innerHTML=html
+reportList.innerHTML=html
 
 }
+
+function markPaid(name,from,to){
+
+payments.push({
+name:name,
+from:from,
+to:to
+})
+
+save()
+
+alert("Marked Paid")
+
+}
+
+loadLabour()
 
 </script>
 
