@@ -7,8 +7,8 @@
 
 body{
 font-family:Arial;
-background:#f4f6fb;
 margin:0;
+background:#f2f4ff;
 }
 
 header{
@@ -25,8 +25,7 @@ box-shadow:0 2px 5px rgba(0,0,0,0.1);
 }
 
 button{
-padding:8px 14px;
-margin:4px;
+padding:6px 12px;
 cursor:pointer;
 }
 
@@ -36,25 +35,25 @@ padding:20px;
 
 .card{
 background:white;
-padding:15px;
+padding:20px;
 border-radius:6px;
 box-shadow:0 3px 10px rgba(0,0,0,0.1);
-margin-bottom:20px;
 }
 
 table{
 width:100%;
 border-collapse:collapse;
+margin-top:10px;
 }
 
-table th,table td{
+th,td{
 border:1px solid #ddd;
-padding:8px;
+padding:6px;
+text-align:center;
 }
 
 input,select{
-padding:6px;
-width:100%;
+padding:5px;
 }
 
 .hidden{
@@ -70,37 +69,39 @@ display:none;
 <header>Employee Attendance System</header>
 
 <nav>
-<button onclick="showScreen('employee')">Employee</button>
-<button onclick="showScreen('attendance')">Attendance</button>
-<button onclick="showScreen('report')">Report</button>
+<button onclick="show('emp')">Employee</button>
+<button onclick="show('att')">Attendance</button>
+<button onclick="show('rep')">Report</button>
 </nav>
 
 <div class="container">
 
-<!-- Employee Screen -->
+<!-- Employee -->
 
-<div id="employee" class="card">
+<div id="emp" class="card">
 
 <h3>Add Employee</h3>
 
-<input id="empName" placeholder="Name"><br><br>
-<input id="empPhone" placeholder="Mobile"><br><br>
+Name <input id="name">
+Phone <input id="phone">
 
-<select id="salaryMode">
+Salary Mode
+<select id="mode">
 <option>Weekly</option>
 <option>15+MonthEnd</option>
 <option>MonthEnd</option>
-</select><br><br>
+</select>
 
-<select id="paymentType">
+Payment
+<select id="type">
 <option>Hourly</option>
 <option>Fixed</option>
-</select><br><br>
+</select>
 
-<input id="hourRate" placeholder="Hour Rate"><br><br>
-<input id="fixedSalary" placeholder="Fixed Salary"><br><br>
+Hour Rate <input id="rate">
+Fixed Salary <input id="salary">
 
-<button onclick="addEmployee()">Add Employee</button>
+<button onclick="addEmp()">Add</button>
 
 <h3>Employee List</h3>
 
@@ -110,7 +111,8 @@ display:none;
 <th>Name</th>
 <th>Type</th>
 <th>Mode</th>
-<th>Action</th>
+<th>Edit</th>
+<th>Delete</th>
 </tr>
 </thead>
 
@@ -120,37 +122,43 @@ display:none;
 
 </div>
 
-<!-- Attendance Screen -->
+<!-- Attendance -->
 
-<div id="attendance" class="card hidden">
+<div id="att" class="card hidden">
 
-<h3>Attendance</h3>
+Date
+<input type="date" id="attDate">
 
-<input type="date" id="attDate"><br><br>
+<table>
 
-<select id="attEmp"></select><br><br>
+<thead>
+<tr>
+<th>Employee</th>
+<th>A/P</th>
+<th>Hours</th>
+<th>Remark</th>
+</tr>
+</thead>
 
-<input id="status" placeholder="A / P"><br><br>
+<tbody id="attTable"></tbody>
 
-<input id="hours" placeholder="Hours (Default 10)"><br><br>
+</table>
 
-<input id="remark" placeholder="Remark"><br><br>
-
-<button onclick="saveAttendance()">Save Attendance</button>
+<button onclick="saveAtt()">Save Attendance</button>
 
 </div>
 
-<!-- Report Screen -->
+<!-- Report -->
 
-<div id="report" class="card hidden">
+<div id="rep" class="card hidden">
 
-<h3>Report</h3>
-
+Employee
 <select id="repEmp"></select>
 
-<button onclick="generateReport()">Generate</button>
+<button onclick="report()">Generate</button>
 
 <table>
+
 <thead>
 <tr>
 <th>Date</th>
@@ -158,14 +166,32 @@ display:none;
 </tr>
 </thead>
 
-<tbody id="reportTable"></tbody>
+<tbody id="repTable"></tbody>
 
 </table>
 
 <br>
 
-<b>Total Hours:</b> <span id="totalHours"></span><br>
-<b>Total Salary:</b> <span id="totalSalary"></span>
+Total Hours : <b id="totH"></b>
+
+<br>
+
+Total Salary : <b id="totS"></b>
+
+<br><br>
+
+Salary Status
+<select id="salaryStatus">
+<option>Current</option>
+<option>Pending</option>
+<option>Paid</option>
+</select>
+
+<label>
+<input type="checkbox" id="paidChk"> Paid
+</label>
+
+<button onclick="saveSalary()">Save Status</button>
 
 </div>
 
@@ -173,55 +199,50 @@ display:none;
 
 <script>
 
-let employees=JSON.parse(localStorage.getItem("employees")||"[]")
-let attendance=JSON.parse(localStorage.getItem("attendance")||"[]")
+let employees=JSON.parse(localStorage.getItem("emp")||"[]")
+let attendance=JSON.parse(localStorage.getItem("att")||"[]")
+let salaryStatus=JSON.parse(localStorage.getItem("salary")||"[]")
 
-function saveData(){
-localStorage.setItem("employees",JSON.stringify(employees))
-localStorage.setItem("attendance",JSON.stringify(attendance))
+function save(){
+localStorage.setItem("emp",JSON.stringify(employees))
+localStorage.setItem("att",JSON.stringify(attendance))
+localStorage.setItem("salary",JSON.stringify(salaryStatus))
 }
 
-function showScreen(id){
+function show(id){
 
-document.getElementById("employee").classList.add("hidden")
-document.getElementById("attendance").classList.add("hidden")
-document.getElementById("report").classList.add("hidden")
+emp.classList.add("hidden")
+att.classList.add("hidden")
+rep.classList.add("hidden")
 
 document.getElementById(id).classList.remove("hidden")
 
+if(id=="att") loadAtt()
+if(id=="rep") loadRep()
+
 }
 
-function addEmployee(){
+function addEmp(){
 
-let emp={
+employees.push({
+
 id:Date.now(),
-name:empName.value,
-phone:empPhone.value,
-mode:salaryMode.value,
-type:paymentType.value,
-rate:Number(hourRate.value),
-salary:Number(fixedSalary.value)
-}
+name:name.value,
+phone:phone.value,
+mode:mode.value,
+type:type.value,
+rate:Number(rate.value),
+salary:Number(salary.value)
 
-employees.push(emp)
+})
 
-saveData()
+save()
 
-loadEmployees()
-
-}
-
-function deleteEmp(id){
-
-employees=employees.filter(e=>e.id!=id)
-
-saveData()
-
-loadEmployees()
+loadEmp()
 
 }
 
-function loadEmployees(){
+function loadEmp(){
 
 let html=""
 
@@ -232,7 +253,8 @@ html+=`
 <td>${e.name}</td>
 <td>${e.type}</td>
 <td>${e.mode}</td>
-<td><button onclick="deleteEmp(${e.id})">Delete</button></td>
+<td><button onclick="editEmp(${e.id})">Edit</button></td>
+<td><button onclick="delEmp(${e.id})">Delete</button></td>
 </tr>
 `
 
@@ -240,44 +262,100 @@ html+=`
 
 empTable.innerHTML=html
 
-let options=""
+}
+
+function delEmp(id){
+
+employees=employees.filter(e=>e.id!=id)
+
+save()
+
+loadEmp()
+
+}
+
+function editEmp(id){
+
+let e=employees.find(x=>x.id==id)
+
+name.value=e.name
+phone.value=e.phone
+mode.value=e.mode
+type.value=e.type
+rate.value=e.rate
+salary.value=e.salary
+
+delEmp(id)
+
+}
+
+function loadAtt(){
+
+let html=""
 
 employees.forEach(e=>{
 
-options+=`<option value="${e.id}">${e.name}</option>`
+html+=`
+<tr>
+<td>${e.name}</td>
+<td><input id="st_${e.id}" placeholder="P"></td>
+<td><input id="hr_${e.id}" value="10"></td>
+<td><input id="rm_${e.id}"></td>
+</tr>
+`
 
 })
 
-attEmp.innerHTML=options
-repEmp.innerHTML=options
+attTable.innerHTML=html
 
 }
 
-function saveAttendance(){
+function saveAtt(){
 
-let st=status.value.toUpperCase()
+let d=attDate.value
 
-let hr=hours.value
+employees.forEach(e=>{
 
-if(st=="P" && hr=="") hr=10
+let st=document.getElementById("st_"+e.id).value
+let hr=document.getElementById("hr_"+e.id).value
+let rm=document.getElementById("rm_"+e.id).value
+
 if(st=="A") hr=0
+
+if(st!="")
 
 attendance.push({
 
-date:attDate.value,
-emp:attEmp.value,
+emp:e.id,
+date:d,
 hours:Number(hr),
-remark:remark.value
+remark:rm
 
 })
 
-saveData()
+})
 
-alert("Saved")
+save()
+
+alert("Attendance Saved")
 
 }
 
-function generateReport(){
+function loadRep(){
+
+let opt=""
+
+employees.forEach(e=>{
+
+opt+=`<option value="${e.id}">${e.name}</option>`
+
+})
+
+repEmp.innerHTML=opt
+
+}
+
+function report(){
 
 let id=repEmp.value
 
@@ -286,25 +364,24 @@ let emp=employees.find(e=>e.id==id)
 let data=attendance.filter(a=>a.emp==id)
 
 let html=""
-
 let total=0
 
-data.forEach(d=>{
+data.forEach(a=>{
 
 html+=`
 <tr>
-<td>${d.date}</td>
-<td>${d.hours}</td>
+<td>${a.date}</td>
+<td>${a.hours}</td>
 </tr>
 `
 
-total+=d.hours
+total+=a.hours
 
 })
 
-reportTable.innerHTML=html
+repTable.innerHTML=html
 
-totalHours.innerText=total
+totH.innerText=total
 
 let salary=0
 
@@ -313,11 +390,27 @@ salary=total*emp.rate
 else
 salary=emp.salary
 
-totalSalary.innerText=salary
+totS.innerText=salary
 
 }
 
-loadEmployees()
+function saveSalary(){
+
+salaryStatus.push({
+
+emp:repEmp.value,
+status:salaryStatus.value,
+paid:paidChk.checked
+
+})
+
+save()
+
+alert("Saved")
+
+}
+
+loadEmp()
 
 attDate.valueAsDate=new Date()
 
