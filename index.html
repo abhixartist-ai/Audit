@@ -1,13 +1,14 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Order PDF Summary</title>
+<title>Amazon Invoice Summary Tool</title>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 
 <style>
+
 body{
-font-family: Arial;
+font-family:Arial;
 background:#f4f6ff;
 padding:20px;
 }
@@ -19,8 +20,8 @@ color:#333;
 table{
 width:100%;
 border-collapse:collapse;
-background:white;
 margin-top:20px;
+background:white;
 }
 
 th,td{
@@ -34,35 +35,36 @@ background:#667eea;
 color:white;
 }
 
-input[type=file]{
-padding:10px;
-background:white;
-border:1px solid #ccc;
+input{
+margin-top:10px;
 }
 
 </style>
+
 </head>
 
 <body>
 
-<h2>Upload Order PDF</h2>
+<h2>Amazon Order PDF Summary</h2>
 
-<input type="file" id="uploadPDF">
+<input type="file" id="pdfUpload">
 
-<table id="orderTable">
+<table id="resultTable">
 <tr>
 <th>S.No</th>
 <th>SKU</th>
 <th>Pack</th>
 <th>Qty</th>
+<th>Total Pieces</th>
 </tr>
 </table>
 
 <script>
 
-let table = document.getElementById("orderTable")
+let table = document.getElementById("resultTable")
+let count = 1
 
-document.getElementById("uploadPDF").addEventListener("change",function(e){
+document.getElementById("pdfUpload").addEventListener("change", function(e){
 
 let file = e.target.files[0]
 let reader = new FileReader()
@@ -79,9 +81,9 @@ pdf.getPage(i).then(function(page){
 
 page.getTextContent().then(function(text){
 
-let content = text.items.map(item=>item.str).join(" ")
+let content = text.items.map(item => item.str).join(" ")
 
-processText(content)
+processInvoice(content)
 
 })
 
@@ -97,32 +99,27 @@ reader.readAsArrayBuffer(file)
 
 })
 
-function processText(text){
+function processInvoice(text){
 
-let words = text.split(" ")
+if(!text.includes("Tax Invoice")) return
 
-let sku = ""
-let pack = "1"
-let qty = "1"
+let skuMatch = text.match(/\(\s*([A-Z0-9\-]+)\s*\)/)
+let packMatch = text.match(/(\d+)\s*Pack/i)
+let qtyMatch = text.match(/₹[\d\.]+\s+(\d+)\s+₹/)
 
-words.forEach(word=>{
+let sku = skuMatch ? skuMatch[1] : "Unknown"
+let pack = packMatch ? parseInt(packMatch[1]) : 1
+let qty = qtyMatch ? parseInt(qtyMatch[1]) : 1
 
-if(word.includes("SKU")){
-sku = word
-}
-
-if(word.includes("Pack")){
-pack = word
-}
-
-})
+let pieces = pack * qty
 
 let row = table.insertRow()
 
-row.insertCell(0).innerHTML = table.rows.length-1
+row.insertCell(0).innerHTML = count++
 row.insertCell(1).innerHTML = sku
 row.insertCell(2).innerHTML = pack
 row.insertCell(3).innerHTML = qty
+row.insertCell(4).innerHTML = pieces
 
 }
 
