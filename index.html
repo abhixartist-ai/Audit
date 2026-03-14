@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Amazon Label Summary Tool</title>
+<title>Amazon Label Tool</title>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
@@ -37,7 +37,6 @@ margin-top:10px;
 <script>
 
 let pdfBuffer
-let skuLines=[]
 
 document.getElementById("upload").addEventListener("change",function(e){
 
@@ -58,6 +57,8 @@ const pdf = await loadingTask.promise
 
 const newPdf = await PDFLib.PDFDocument.create()
 
+let storedLabelPage=null
+
 for(let i=1;i<=pdf.numPages;i++){
 
 const page = await pdf.getPage(i)
@@ -77,35 +78,33 @@ let qty = qtyMatch ? parseInt(qtyMatch[1]) : 1
 
 let pcs = pack * qty
 
-skuLines.push(`SKU ${sku} (${pack}×${qty}=${pcs})`)
+let line = `SKU ${sku} (${pack}×${qty}=${pcs})`
 
-continue
-}
+if(storedLabelPage!=null){
 
 const originalPdf = await PDFLib.PDFDocument.load(pdfBuffer)
-
-const [copiedPage] = await newPdf.copyPages(originalPdf,[i-1])
+const [copiedPage] = await newPdf.copyPages(originalPdf,[storedLabelPage])
 
 newPdf.addPage(copiedPage)
 
 let pages=newPdf.getPages()
 let lastPage=pages[pages.length-1]
 
-let yPosition=140
-
-skuLines.forEach(line=>{
-
 lastPage.drawText(line,{
 x:60,
-y:yPosition,
+y:140,
 size:12
 })
 
-yPosition-=15
+storedLabelPage=null
 
-})
+}
 
-skuLines=[]
+}else{
+
+storedLabelPage=i-1
+
+}
 
 }
 
