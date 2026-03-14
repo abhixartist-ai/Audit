@@ -2,16 +2,26 @@
 <html>
 <head>
 
-<title>Amazon Label Tool</title>
+<title>Amazon Label Generator</title>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <style>
+
 body{
 font-family:Arial;
-padding:20px;
+padding:30px;
 background:#f4f6ff;
+}
+
+#dropZone{
+border:2px dashed #667eea;
+padding:40px;
+text-align:center;
+margin-bottom:20px;
+background:white;
 }
 
 button{
@@ -20,32 +30,42 @@ background:#667eea;
 color:white;
 border:none;
 cursor:pointer;
-margin-top:10px;
+margin-right:10px;
 }
+
 </style>
 
 </head>
 
 <body>
 
-<h3>Upload Amazon Order PDF</h3>
-<input type="file" id="pdfUpload">
+<h2>Amazon Label Tool</h2>
 
-<br><br>
-
-<h3>Upload SKU Replacement CSV</h3>
-<input type="file" id="csvUpload">
-
-<br><br>
+<div id="dropZone">
+Drag & Drop Amazon PDF Here
+</div>
 
 <button onclick="processPDF()">Generate Labels</button>
+<button onclick="downloadSummary()">Download Summary Excel</button>
 
 <script>
 
 let pdfBuffer
 let skuMap={}
+let lastLabelPage=null
+let summary=[]
+let serial=1
 
-document.getElementById("pdfUpload").addEventListener("change",function(e){
+const dropZone=document.getElementById("dropZone")
+
+dropZone.addEventListener("dragover",e=>{
+e.preventDefault()
+})
+
+dropZone.addEventListener("drop",e=>{
+e.preventDefault()
+
+let file=e.dataTransfer.files[0]
 
 let reader=new FileReader()
 
@@ -53,17 +73,16 @@ reader.onload=function(){
 pdfBuffer=this.result
 }
 
-reader.readAsArrayBuffer(e.target.files[0])
+reader.readAsArrayBuffer(file)
 
 })
 
-document.getElementById("csvUpload").addEventListener("change",function(e){
+async function loadCSV(){
 
-let reader=new FileReader()
+let response=await fetch("sku_map.csv")
+let text=await response.text()
 
-reader.onload=function(){
-
-let rows=this.result.split("\n")
+let rows=text.split("\n")
 
 rows.slice(1).forEach(r=>{
 
@@ -74,7 +93,11 @@ if(col.length>=2){
 let sku=col[0].trim()
 let rep=col[1].trim()
 
-skuMap[sku]=rep
+if(!skuMap[sku]){
+skuMap[sku]=[]
+}
+
+skuMap[sku].push(rep)
 
 }
 
@@ -82,9 +105,7 @@ skuMap[sku]=rep
 
 }
 
-reader.readAsText(e.target.files[0])
-
-})
+loadCSV()
 
 async function processPDF(){
 
@@ -93,8 +114,6 @@ const pdf = await loadingTask.promise
 
 const newPdf = await PDFLib.PDFDocument.create()
 
-let storedLabel=null
-
 for(let i=1;i<=pdf.numPages;i++){
 
 const page = await pdf.getPage(i)
@@ -102,48 +121,78 @@ const textContent = await page.getTextContent()
 
 let text=textContent.items.map(i=>i.str).join(" ")
 
-if(text.includes("Tax Invoice")){
+if(text.includes("ATSPL")){
 
-let skuMatch=text.match(/\(\s*([A-Z0-9\-]+)\s*\)/)
-let qtyMatch=text.match(/₹[\d\.]+\s+(\d+)\s+₹/)
+lastLabelPage=i-1
+continue
 
-let sku=skuMatch ? skuMatch[1] : ""
-let qty=qtyMatch ? parseInt(qtyMatch[1]) : 1
+}
 
-let replacement=skuMap[sku] || sku
+if(lastLabelPage!=null && text.includes("(")){
 
-let packMatch=replacement.match(/(\d+)$/)
+let skuMatches=[...text.matchAll(/\(\s*([A-Z0-9\-]+)\s*\)/g)]
+let qtyMatches=[...text.matchAll(/₹[\d\.]+\s+(\d+)\s+₹/g)]
 
+let lines=[]
+
+for(let k=0;k<skuMatches.length;k++){
+
+let sku=skuMatches[k][1]
+let qty=qtyMatches[k] ? parseInt(qtyMatches[k][1]) : 1
+
+let replacements=skuMap[sku] || [sku]
+
+let packTotal=0
+
+replacements.forEach(rep=>{
+
+let packMatch=rep.match(/(\d+)$/)
 let pack=packMatch ? parseInt(packMatch[1]) : 1
 
-let pcs=pack*qty
+packTotal+=pack
 
-let printText=`${replacement} ×${qty} (${pcs})`
+})
 
-if(storedLabel!=null){
+let pcs=packTotal*qty
+
+let names=replacements.join(", ")
+
+lines.push(`${names} ×${qty} (${pcs})`)
+
+summary.push({
+sno:serial++,
+sku:sku,
+replacement:names,
+qty:qty,
+pcs:pcs
+})
+
+}
 
 const originalPdf=await PDFLib.PDFDocument.load(pdfBuffer)
 
-const [copiedPage]=await newPdf.copyPages(originalPdf,[storedLabel])
+const [copiedPage]=await newPdf.copyPages(originalPdf,[lastLabelPage])
 
 newPdf.addPage(copiedPage)
 
 let pages=newPdf.getPages()
 let lastPage=pages[pages.length-1]
 
-lastPage.drawText(printText,{
+let y=140
+
+lines.forEach(line=>{
+
+lastPage.drawText(line,{
 x:60,
-y:140,
+y:y,
 size:12
 })
 
-storedLabel=null
+y-=16
 
-}
+})
 
-}else{
-
-storedLabel=i-1
+lastLabelPage=null
 
 }
 
@@ -156,10 +205,25 @@ let blob=new Blob([pdfBytes],{type:"application/pdf"})
 let link=document.createElement("a")
 
 link.href=URL.createObjectURL(blob)
-
 link.download="labels.pdf"
-
 link.click()
+
+}
+
+function downloadSummary(){
+
+let data=[["S.No","SKU","Replacement","Qty","Total PCS"]]
+
+summary.forEach(r=>{
+data.push([r.sno,r.sku,r.replacement,r.qty,r.pcs])
+})
+
+let ws=XLSX.utils.aoa_to_sheet(data)
+let wb=XLSX.utils.book_new()
+
+XLSX.utils.book_append_sheet(wb,ws,"Summary")
+
+XLSX.writeFile(wb,"packing_summary.xlsx")
 
 }
 
