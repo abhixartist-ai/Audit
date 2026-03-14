@@ -1,41 +1,24 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Amazon Invoice Summary Tool</title>
+<title>Amazon Label SKU Tool</title>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+<script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
 
 <style>
 
 body{
 font-family:Arial;
-background:#f4f6ff;
 padding:20px;
+background:#f4f6ff;
 }
 
-h2{
-color:#333;
-}
-
-table{
-width:100%;
-border-collapse:collapse;
-margin-top:20px;
-background:white;
-}
-
-th,td{
-border:1px solid #ccc;
-padding:10px;
-text-align:center;
-}
-
-th{
+button{
+padding:10px 20px;
 background:#667eea;
 color:white;
-}
-
-input{
+border:none;
 margin-top:10px;
 }
 
@@ -45,81 +28,63 @@ margin-top:10px;
 
 <body>
 
-<h2>Amazon Order PDF Summary</h2>
+<h2>Upload Amazon PDF</h2>
 
-<input type="file" id="pdfUpload">
+<input type="file" id="upload">
 
-<table id="resultTable">
-<tr>
-<th>S.No</th>
-<th>SKU</th>
-<th>Pack</th>
-<th>Qty</th>
-<th>Total Pieces</th>
-</tr>
-</table>
+<button onclick="processPDF()">Create Label PDF</button>
 
 <script>
 
-let table = document.getElementById("resultTable")
-let count = 1
+let fileData
 
-document.getElementById("pdfUpload").addEventListener("change", function(e){
+document.getElementById("upload").addEventListener("change",function(e){
 
-let file = e.target.files[0]
-let reader = new FileReader()
+let reader=new FileReader()
 
-reader.onload = function(){
+reader.onload=function(){
 
-let typedarray = new Uint8Array(this.result)
+fileData=this.result
 
-pdfjsLib.getDocument(typedarray).promise.then(function(pdf){
+}
 
-for(let i=1;i<=pdf.numPages;i++){
-
-pdf.getPage(i).then(function(page){
-
-page.getTextContent().then(function(text){
-
-let content = text.items.map(item => item.str).join(" ")
-
-processInvoice(content)
+reader.readAsArrayBuffer(e.target.files[0])
 
 })
+
+async function processPDF(){
+
+const pdfDoc=await PDFLib.PDFDocument.load(fileData)
+
+const pages=pdfDoc.getPages()
+
+for(let i=0;i<pages.length;i++){
+
+let page=pages[i]
+
+let {width,height}=page.getSize()
+
+page.drawText("SKU C9-R9K1-M7M6 (2×1=2)",{
+
+x:40,
+y:height-120,
+size:10
 
 })
 
 }
 
-})
+const pdfBytes=await pdfDoc.save()
 
-}
+let blob=new Blob([pdfBytes],{type:"application/pdf"})
 
-reader.readAsArrayBuffer(file)
+let link=document.createElement("a")
 
-})
+link.href=URL.createObjectURL(blob)
 
-function processInvoice(text){
+link.download="labels.pdf"
 
-if(!text.includes("Tax Invoice")) return
-
-let skuMatch = text.match(/\(\s*([A-Z0-9\-]+)\s*\)/)
-let packMatch = text.match(/(\d+)\s*Pack/i)
-let qtyMatch = text.match(/₹[\d\.]+\s+(\d+)\s+₹/)
-
-let sku = skuMatch ? skuMatch[1] : "Unknown"
-let pack = packMatch ? parseInt(packMatch[1]) : 1
-let qty = qtyMatch ? parseInt(qtyMatch[1]) : 1
-
-let pieces = pack * qty
-
-let row = table.insertRow()
-
-row.insertCell(0).innerHTML = count++
-row.insertCell(1).innerHTML = sku
-row.insertCell(2).innerHTML = pack
-row.insertCell(3).innerHTML = qty
-row.insertCell(4).innerHTML = pieces
+link.click()
 
 }
 
