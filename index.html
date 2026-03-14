@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+
 <title>Amazon Label SKU Tool</title>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
@@ -11,7 +12,7 @@
 body{
 font-family:Arial;
 padding:20px;
-background:#f4f6ff;
+background:#f5f6ff;
 }
 
 button{
@@ -28,7 +29,7 @@ margin-top:10px;
 
 <body>
 
-<h2>Upload Amazon PDF</h2>
+<h2>Upload Amazon Order PDF</h2>
 
 <input type="file" id="upload">
 
@@ -36,16 +37,14 @@ margin-top:10px;
 
 <script>
 
-let fileData
+let fileBuffer
 
 document.getElementById("upload").addEventListener("change",function(e){
 
 let reader=new FileReader()
 
 reader.onload=function(){
-
-fileData=this.result
-
+fileBuffer=this.result
 }
 
 reader.readAsArrayBuffer(e.target.files[0])
@@ -54,9 +53,11 @@ reader.readAsArrayBuffer(e.target.files[0])
 
 async function processPDF(){
 
-const pdfDoc=await PDFLib.PDFDocument.load(fileData)
+const pdfDoc=await PDFLib.PDFDocument.load(fileBuffer)
 
 const pages=pdfDoc.getPages()
+
+let skuText="SKU C9-R9K1-M7M6 (2×1=2)"   // demo
 
 for(let i=0;i<pages.length;i++){
 
@@ -64,11 +65,11 @@ let page=pages[i]
 
 let {width,height}=page.getSize()
 
-page.drawText("SKU C9-R9K1-M7M6 (2×1=2)",{
+page.drawText(skuText,{
 
-x:40,
-y:height-120,
-size:10
+x:60,
+y:220,
+size:12
 
 })
 
@@ -82,7 +83,7 @@ let link=document.createElement("a")
 
 link.href=URL.createObjectURL(blob)
 
-link.download="labels.pdf"
+link.download="amazon_labels.pdf"
 
 link.click()
 
