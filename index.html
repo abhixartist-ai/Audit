@@ -1,421 +1,132 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Employee Attendance System</title>
+<title>Order PDF Summary</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 
 <style>
-
 body{
-font-family:Arial;
-margin:0;
-background:#f2f4ff;
-}
-
-header{
-background:linear-gradient(90deg,#667eea,#764ba2);
-color:white;
-padding:15px;
-font-size:22px;
-}
-
-nav{
-background:white;
-padding:10px;
-box-shadow:0 2px 5px rgba(0,0,0,0.1);
-}
-
-button{
-padding:6px 12px;
-cursor:pointer;
-}
-
-.container{
+font-family: Arial;
+background:#f4f6ff;
 padding:20px;
 }
 
-.card{
-background:white;
-padding:20px;
-border-radius:6px;
-box-shadow:0 3px 10px rgba(0,0,0,0.1);
+h2{
+color:#333;
 }
 
 table{
 width:100%;
 border-collapse:collapse;
-margin-top:10px;
+background:white;
+margin-top:20px;
 }
 
 th,td{
-border:1px solid #ddd;
-padding:6px;
+border:1px solid #ccc;
+padding:10px;
 text-align:center;
 }
 
-input,select{
-padding:5px;
+th{
+background:#667eea;
+color:white;
 }
 
-.hidden{
-display:none;
+input[type=file]{
+padding:10px;
+background:white;
+border:1px solid #ccc;
 }
 
 </style>
-
 </head>
 
 <body>
 
-<header>Employee Attendance System</header>
+<h2>Upload Order PDF</h2>
 
-<nav>
-<button onclick="show('emp')">Employee</button>
-<button onclick="show('att')">Attendance</button>
-<button onclick="show('rep')">Report</button>
-</nav>
+<input type="file" id="uploadPDF">
 
-<div class="container">
-
-<!-- Employee -->
-
-<div id="emp" class="card">
-
-<h3>Add Employee</h3>
-
-Name <input id="name">
-Phone <input id="phone">
-
-Salary Mode
-<select id="mode">
-<option>Weekly</option>
-<option>15+MonthEnd</option>
-<option>MonthEnd</option>
-</select>
-
-Payment
-<select id="type">
-<option>Hourly</option>
-<option>Fixed</option>
-</select>
-
-Hour Rate <input id="rate">
-Fixed Salary <input id="salary">
-
-<button onclick="addEmp()">Add</button>
-
-<h3>Employee List</h3>
-
-<table>
-<thead>
+<table id="orderTable">
 <tr>
-<th>Name</th>
-<th>Type</th>
-<th>Mode</th>
-<th>Edit</th>
-<th>Delete</th>
+<th>S.No</th>
+<th>SKU</th>
+<th>Pack</th>
+<th>Qty</th>
 </tr>
-</thead>
-
-<tbody id="empTable"></tbody>
-
 </table>
-
-</div>
-
-<!-- Attendance -->
-
-<div id="att" class="card hidden">
-
-Date
-<input type="date" id="attDate">
-
-<table>
-
-<thead>
-<tr>
-<th>Employee</th>
-<th>A/P</th>
-<th>Hours</th>
-<th>Remark</th>
-</tr>
-</thead>
-
-<tbody id="attTable"></tbody>
-
-</table>
-
-<button onclick="saveAtt()">Save Attendance</button>
-
-</div>
-
-<!-- Report -->
-
-<div id="rep" class="card hidden">
-
-Employee
-<select id="repEmp"></select>
-
-<button onclick="report()">Generate</button>
-
-<table>
-
-<thead>
-<tr>
-<th>Date</th>
-<th>Hours</th>
-</tr>
-</thead>
-
-<tbody id="repTable"></tbody>
-
-</table>
-
-<br>
-
-Total Hours : <b id="totH"></b>
-
-<br>
-
-Total Salary : <b id="totS"></b>
-
-<br><br>
-
-Salary Status
-<select id="salaryStatus">
-<option>Current</option>
-<option>Pending</option>
-<option>Paid</option>
-</select>
-
-<label>
-<input type="checkbox" id="paidChk"> Paid
-</label>
-
-<button onclick="saveSalary()">Save Status</button>
-
-</div>
-
-</div>
 
 <script>
 
-let employees=JSON.parse(localStorage.getItem("emp")||"[]")
-let attendance=JSON.parse(localStorage.getItem("att")||"[]")
-let salaryStatus=JSON.parse(localStorage.getItem("salary")||"[]")
+let table = document.getElementById("orderTable")
 
-function save(){
-localStorage.setItem("emp",JSON.stringify(employees))
-localStorage.setItem("att",JSON.stringify(attendance))
-localStorage.setItem("salary",JSON.stringify(salaryStatus))
-}
+document.getElementById("uploadPDF").addEventListener("change",function(e){
 
-function show(id){
+let file = e.target.files[0]
+let reader = new FileReader()
 
-emp.classList.add("hidden")
-att.classList.add("hidden")
-rep.classList.add("hidden")
+reader.onload = function(){
 
-document.getElementById(id).classList.remove("hidden")
+let typedarray = new Uint8Array(this.result)
 
-if(id=="att") loadAtt()
-if(id=="rep") loadRep()
+pdfjsLib.getDocument(typedarray).promise.then(function(pdf){
 
-}
+for(let i=1;i<=pdf.numPages;i++){
 
-function addEmp(){
+pdf.getPage(i).then(function(page){
 
-employees.push({
+page.getTextContent().then(function(text){
 
-id:Date.now(),
-name:name.value,
-phone:phone.value,
-mode:mode.value,
-type:type.value,
-rate:Number(rate.value),
-salary:Number(salary.value)
+let content = text.items.map(item=>item.str).join(" ")
 
-})
-
-save()
-
-loadEmp()
-
-}
-
-function loadEmp(){
-
-let html=""
-
-employees.forEach(e=>{
-
-html+=`
-<tr>
-<td>${e.name}</td>
-<td>${e.type}</td>
-<td>${e.mode}</td>
-<td><button onclick="editEmp(${e.id})">Edit</button></td>
-<td><button onclick="delEmp(${e.id})">Delete</button></td>
-</tr>
-`
-
-})
-
-empTable.innerHTML=html
-
-}
-
-function delEmp(id){
-
-employees=employees.filter(e=>e.id!=id)
-
-save()
-
-loadEmp()
-
-}
-
-function editEmp(id){
-
-let e=employees.find(x=>x.id==id)
-
-name.value=e.name
-phone.value=e.phone
-mode.value=e.mode
-type.value=e.type
-rate.value=e.rate
-salary.value=e.salary
-
-delEmp(id)
-
-}
-
-function loadAtt(){
-
-let html=""
-
-employees.forEach(e=>{
-
-html+=`
-<tr>
-<td>${e.name}</td>
-<td><input id="st_${e.id}" placeholder="P"></td>
-<td><input id="hr_${e.id}" value="10"></td>
-<td><input id="rm_${e.id}"></td>
-</tr>
-`
-
-})
-
-attTable.innerHTML=html
-
-}
-
-function saveAtt(){
-
-let d=attDate.value
-
-employees.forEach(e=>{
-
-let st=document.getElementById("st_"+e.id).value
-let hr=document.getElementById("hr_"+e.id).value
-let rm=document.getElementById("rm_"+e.id).value
-
-if(st=="A") hr=0
-
-if(st!="")
-
-attendance.push({
-
-emp:e.id,
-date:d,
-hours:Number(hr),
-remark:rm
+processText(content)
 
 })
 
 })
 
-save()
-
-alert("Attendance Saved")
-
 }
-
-function loadRep(){
-
-let opt=""
-
-employees.forEach(e=>{
-
-opt+=`<option value="${e.id}">${e.name}</option>`
 
 })
 
-repEmp.innerHTML=opt
-
 }
 
-function report(){
-
-let id=repEmp.value
-
-let emp=employees.find(e=>e.id==id)
-
-let data=attendance.filter(a=>a.emp==id)
-
-let html=""
-let total=0
-
-data.forEach(a=>{
-
-html+=`
-<tr>
-<td>${a.date}</td>
-<td>${a.hours}</td>
-</tr>
-`
-
-total+=a.hours
+reader.readAsArrayBuffer(file)
 
 })
 
-repTable.innerHTML=html
+function processText(text){
 
-totH.innerText=total
+let words = text.split(" ")
 
-let salary=0
+let sku = ""
+let pack = "1"
+let qty = "1"
 
-if(emp.type=="Hourly")
-salary=total*emp.rate
-else
-salary=emp.salary
+words.forEach(word=>{
 
-totS.innerText=salary
-
+if(word.includes("SKU")){
+sku = word
 }
 
-function saveSalary(){
-
-salaryStatus.push({
-
-emp:repEmp.value,
-status:salaryStatus.value,
-paid:paidChk.checked
+if(word.includes("Pack")){
+pack = word
+}
 
 })
 
-save()
+let row = table.insertRow()
 
-alert("Saved")
+row.insertCell(0).innerHTML = table.rows.length-1
+row.insertCell(1).innerHTML = sku
+row.insertCell(2).innerHTML = pack
+row.insertCell(3).innerHTML = qty
 
 }
-
-loadEmp()
-
-attDate.valueAsDate=new Date()
 
 </script>
 
 </body>
-
 </html>
