@@ -1,17 +1,16 @@
 <!DOCTYPE html>
 <html>
 <head>
+<title>Amazon Label Tool</title>
 
-<title>Amazon Label SKU Tool</title>
-
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
 
 <style>
-
 body{
 font-family:Arial;
 padding:20px;
-background:#f5f6ff;
+background:#f4f6ff;
 }
 
 button{
@@ -20,30 +19,32 @@ background:#667eea;
 color:white;
 border:none;
 margin-top:10px;
+cursor:pointer;
 }
-
 </style>
 
 </head>
 
 <body>
 
-<h2>Upload Amazon Label PDF</h2>
+<h2>Upload Amazon Order PDF</h2>
 
 <input type="file" id="upload">
+
+<br><br>
 
 <button onclick="processPDF()">Create Label PDF</button>
 
 <script>
 
-let fileBuffer
+let pdfBuffer
 
 document.getElementById("upload").addEventListener("change",function(e){
 
 let reader=new FileReader()
 
 reader.onload=function(){
-fileBuffer=this.result
+pdfBuffer=this.result
 }
 
 reader.readAsArrayBuffer(e.target.files[0])
@@ -52,27 +53,39 @@ reader.readAsArrayBuffer(e.target.files[0])
 
 async function processPDF(){
 
-const pdfDoc=await PDFLib.PDFDocument.load(fileBuffer)
+const loadingTask = pdfjsLib.getDocument({data: pdfBuffer})
+const pdf = await loadingTask.promise
 
-const pages=pdfDoc.getPages()
+const newPdf = await PDFLib.PDFDocument.create()
 
-let skuText="SKU C9-R9K1-M7M6 (2×1=2)"
+for(let i=1;i<=pdf.numPages;i++){
 
-for(let i=0;i<pages.length;i++){
+const page = await pdf.getPage(i)
+const textContent = await page.getTextContent()
 
-let page=pages[i]
+let text = textContent.items.map(item=>item.str).join(" ")
 
-page.drawText(skuText,{
+if(text.includes("Tax Invoice")){
+continue
+}
 
+const originalPdf = await PDFLib.PDFDocument.load(pdfBuffer)
+const [copiedPage] = await newPdf.copyPages(originalPdf,[i-1])
+
+newPdf.addPage(copiedPage)
+
+let pages=newPdf.getPages()
+let lastPage=pages[pages.length-1]
+
+lastPage.drawText("SKU C9-R9K1-M7M6 (2×1=2)",{
 x:60,
 y:140,
 size:12
-
 })
 
 }
 
-const pdfBytes=await pdfDoc.save()
+const pdfBytes = await newPdf.save()
 
 let blob=new Blob([pdfBytes],{type:"application/pdf"})
 
