@@ -265,18 +265,14 @@ let lastPage=pages[pages.length-1]
 let startY = 180
 let lineHeight = 16
 
-let y = startY
+for(let i=0;i<lines.length;i++){
 
-lines.forEach(line=>{
+let y = startY - (i * lineHeight)
 
-lastPage.drawText(line,{
+lastPage.drawText(lines[i],{
 x:60,
 y:y,
 size:12
-})
-
-y -= lineHeight
-
 })
 
 }
