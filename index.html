@@ -62,14 +62,14 @@ margin-top:10px;
 
 <h2>Enter Password</h2>
 
-<input type="password" id="passInput" placeholder="Password"
-style="padding:10px;font-size:16px;margin-bottom:10px;">
+<input type="password" id="passInput" placeholder="Password" style="padding:10px;font-size:16px;margin-bottom:10px;">
 
 <button onclick="checkPassword()">Enter</button>
 
 <p id="errorMsg" style="color:red;"></p>
 
 </div>
+
 
 <h2>Amazon Label Tool</h2>
 
@@ -93,17 +93,23 @@ function checkPassword(){
 let pass=document.getElementById("passInput").value
 
 if(pass==="1234"){
+
 document.getElementById("loginBox").style.display="none"
+
 }else{
+
 document.getElementById("errorMsg").innerText="Wrong Password"
+
 }
 
 }
+
 
 let pdfBuffer
 let skuMap={}
 let summary=[]
 let serial=1
+
 
 document.getElementById("pdfUpload").addEventListener("change",function(e){
 
@@ -119,6 +125,7 @@ document.getElementById("status").innerText="PDF Loaded"
 reader.readAsArrayBuffer(file)
 
 })
+
 
 const dropZone=document.getElementById("dropZone")
 
@@ -142,6 +149,7 @@ document.getElementById("status").innerText="PDF Loaded"
 reader.readAsArrayBuffer(file)
 
 })
+
 
 async function loadCSV(){
 
@@ -173,6 +181,7 @@ skuMap[sku].push(rep)
 
 loadCSV()
 
+
 async function processPDF(){
 
 summary=[]
@@ -184,8 +193,6 @@ const pdf = await loadingTask.promise
 const newPdf = await PDFLib.PDFDocument.create()
 const originalPdf = await PDFLib.PDFDocument.load(pdfBuffer)
 
-const font = await newPdf.embedFont(PDFLib.StandardFonts.Helvetica)
-
 for(let i=1;i<=pdf.numPages;i++){
 
 const page = await pdf.getPage(i)
@@ -195,9 +202,9 @@ let text=textContent.items.map(i=>i.str).join(" ")
 
 if(!text.includes("Tax Invoice")){
 
-let invoicePageNumber=i
+let invoicePageNumber = i
 
-if(invoicePageNumber>=pdf.numPages) continue
+if(invoicePageNumber >= pdf.numPages) continue
 
 const invoicePage = await pdf.getPage(invoicePageNumber+1)
 const invoiceTextContent = await invoicePage.getTextContent()
@@ -205,6 +212,7 @@ const invoiceTextContent = await invoicePage.getTextContent()
 let invoiceText = invoiceTextContent.items.map(i=>i.str).join(" ")
 
 if(!invoiceText.includes("Tax Invoice")) continue
+
 
 let skuMatches=[...invoiceText.matchAll(/\(\s*([A-Z0-9\-]+)\s*\)/g)]
 let qtyMatches=[...invoiceText.matchAll(/₹[\d\.]+\s+(\d+)\s+₹/g)]
@@ -236,7 +244,7 @@ let names=replacements.join(", ")
 lines.push(`${names} ×${qty} (${pcs})`)
 
 summary.push({
-orderCount:k==0?1:"",
+orderCount: k==0 ? 1 : "",
 sno:serial++,
 sku:sku,
 replacement:names,
@@ -246,6 +254,7 @@ pcs:pcs
 
 }
 
+
 const [copiedPage]=await newPdf.copyPages(originalPdf,[i-1])
 
 newPdf.addPage(copiedPage)
@@ -253,7 +262,7 @@ newPdf.addPage(copiedPage)
 let pages=newPdf.getPages()
 let lastPage=pages[pages.length-1]
 
-let startY = 190
+let startY = 180
 let lineHeight = 16
 
 let y = startY
@@ -264,10 +273,6 @@ lastPage.drawText(line,{
 x:60,
 y:y,
 size:12
-})
-
-y -= lineHeight
-
 })
 
 y -= lineHeight
@@ -293,6 +298,7 @@ link.click()
 document.getElementById("status").innerText="Labels Generated"
 
 }
+
 
 function downloadSummary(){
 
