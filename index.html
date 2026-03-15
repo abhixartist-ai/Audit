@@ -193,7 +193,7 @@ const textContent = await page.getTextContent()
 
 let text=textContent.items.map(i=>i.str).join(" ")
 
-if(text.includes("Order ID")){
+if(text.includes("Order Id")){
 
 let skuMatches=[...text.matchAll(/\(\s*([A-Z0-9\-]+)\s*\)/g)]
 let qtyMatches=[...text.matchAll(/₹[\d\.]+\s+(\d+)\s+₹/g)]
