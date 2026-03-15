@@ -1,5 +1,27 @@
 <!DOCTYPE html><html>
-<head><title>Amazon Label Tool</title><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script><script>
+<head><title>Amazon Label Tool</title><script>
+
+(function(){
+
+let t=new Date()
+
+let d=String(t.getDate()).padStart(2,'0')
+let m=String(t.getMonth()+1).padStart(2,'0')
+
+let correct=d+m
+
+let p=prompt("Enter Password")
+
+if(p!==correct){
+
+document.write("<h2 style='text-align:center;margin-top:120px;font-family:Arial'>Access Denied</h2>")
+throw new Error("Blocked")
+
+}
+
+})()
+
+</script><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script><script>
 pdfjsLib.GlobalWorkerOptions.workerSrc =
 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 </script><script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script><style>
@@ -28,30 +50,7 @@ margin-right:10px;
 margin-top:10px;
 }
 
-</style></head><body><script>
-
-(function(){
-
-let today=new Date()
-
-let day=String(today.getDate()).padStart(2,'0')
-let month=String(today.getMonth()+1).padStart(2,'0')
-
-let correct=btoa(day+month)
-
-let user=prompt("Enter Password")
-
-if(btoa(user)!==correct){
-
-document.body.innerHTML="<h2 style='text-align:center;margin-top:120px'>Access Denied</h2>"
-
-throw new Error("Wrong Password")
-
-}
-
-})();
-
-</script><h2>Amazon Label Tool</h2><input type="file" id="pdfUpload"><div id="dropZone">
+</style></head><body><h2>Amazon Label Tool</h2><input type="file" id="pdfUpload"><div id="dropZone">
 Drag & Drop Amazon PDF Here
 </div><br><button onclick="processPDF()">Generate Labels</button>
 <button onclick="downloadSummary()">Download Summary Excel</button>
@@ -149,7 +148,7 @@ let text=textContent.items.map(i=>i.str).join(" ")
 
 if(text.includes("Tax Invoice")){
 
-let labelIndex=i-1
+let labelIndex=i-2
 
 let skuMatches=[...text.matchAll(/\s*([A-Z0-9\-]+)\s*/g)]
 let qtyMatches=[...text.matchAll(/₹[\d\.]+\s+(\d+)\s+₹/g)]
