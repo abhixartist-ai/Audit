@@ -106,6 +106,7 @@ let skuMap={}
 let summary=[]
 let serial=1
 let orderNumber=1
+let boldFont
 
 
 document.getElementById("pdfUpload").addEventListener("change",function(e){
@@ -189,6 +190,10 @@ const loadingTask = pdfjsLib.getDocument({data: pdfBuffer})
 const pdf = await loadingTask.promise
 
 const newPdf = await PDFLib.PDFDocument.create()
+boldFont = await newPdf.embedFont(PDFLib.StandardFonts.HelveticaBold)
+
+const normalFont = await newPdf.embedFont(PDFLib.StandardFonts.Helvetica)
+
 const originalPdf = await PDFLib.PDFDocument.load(pdfBuffer)
 
 for(let i=1;i<=pdf.numPages;i++){
@@ -215,7 +220,7 @@ if(!invoiceText.includes("Tax Invoice")) continue
 let skuMatches=[...invoiceText.matchAll(/\(\s*([A-Z0-9\-\.]+)\s*\)/g)]
 let qtyMatches=[...invoiceText.matchAll(/₹[\d\.]+\s+(\d+)\s+₹/g)]
 
-let lines=[]
+let items=[]
 
 for(let k=0;k<skuMatches.length;k++){
 
@@ -227,25 +232,24 @@ let replacements=skuMap[sku] || [sku]
 let packTotal=0
 
 replacements.forEach(rep=>{
-
 let packMatch=rep.match(/(\d+)$/)
 let pack=packMatch ? parseInt(packMatch[1]) : 1
-
 packTotal+=pack
-
 })
 
 let pcs=packTotal*qty
 
-let names=replacements.join(", ")
-
-lines.push(`${names} ×${qty} (${pcs})`)
+items.push({
+name:replacements.join(", "),
+qty:qty,
+pcs:pcs
+})
 
 summary.push({
-order: k==0 ? orderNumber : "",
+order:k==0?orderNumber:"",
 sno:serial++,
 sku:sku,
-replacement:names,
+replacement:replacements.join(", "),
 qty:qty,
 pcs:pcs
 })
@@ -254,7 +258,6 @@ pcs:pcs
 
 orderNumber++
 
-
 const [copiedPage]=await newPdf.copyPages(originalPdf,[i-1])
 
 newPdf.addPage(copiedPage)
@@ -262,18 +265,32 @@ newPdf.addPage(copiedPage)
 let pages=newPdf.getPages()
 let lastPage=pages[pages.length-1]
 
-
-let startY = 190
+let startY = 180
 let lineHeight = 14
 
-for (let j = 0; j < lines.length; j++) {
+for(let j=0;j<items.length;j++){
 
-let y = startY - (j * lineHeight)
+let y=startY-(j*lineHeight)
 
-lastPage.drawText(lines[j], {
-x: 50,
-y: y,
-size: 12
+lastPage.drawText(items[j].name,{
+x:50,
+y:y,
+size:12,
+font:normalFont
+})
+
+lastPage.drawText("×"+items[j].qty,{
+x:180,
+y:y,
+size:12,
+font:normalFont
+})
+
+lastPage.drawText("("+items[j].pcs+")",{
+x:220,
+y:y,
+size:12,
+font:boldFont
 })
 
 }
