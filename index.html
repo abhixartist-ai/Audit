@@ -191,7 +191,6 @@ const pdf = await loadingTask.promise
 
 const newPdf = await PDFLib.PDFDocument.create()
 boldFont = await newPdf.embedFont(PDFLib.StandardFonts.HelveticaBold)
-
 const normalFont = await newPdf.embedFont(PDFLib.StandardFonts.Helvetica)
 
 const originalPdf = await PDFLib.PDFDocument.load(pdfBuffer)
@@ -272,22 +271,19 @@ for(let j=0;j<items.length;j++){
 
 let y=startY-(j*lineHeight)
 
-lastPage.drawText(items[j].name,{
+let leftText = items[j].name + " ×" + items[j].qty + "      "
+
+let pcsText = "(" + items[j].pcs + ")"
+
+lastPage.drawText(leftText,{
 x:50,
 y:y,
 size:12,
 font:normalFont
 })
 
-lastPage.drawText("×"+items[j].qty,{
-x:180,
-y:y,
-size:12,
-font:normalFont
-})
-
-lastPage.drawText("("+items[j].pcs+")",{
-x:220,
+lastPage.drawText(pcsText,{
+x:50 + leftText.length * 6,
 y:y,
 size:12,
 font:boldFont
