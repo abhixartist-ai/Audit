@@ -1,18 +1,202 @@
-let currentLabel = null
+<!DOCTYPE html>
+<html>
+<head>
+
+<title>Amazon Label Tool</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+</script>
+
+<script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<style>
+
+body{
+font-family:Arial;
+padding:30px;
+background:#f4f6ff;
+}
+
+#loginBox{
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:#f4f6ff;
+display:flex;
+justify-content:center;
+align-items:center;
+flex-direction:column;
+z-index:9999;
+}
+
+#dropZone{
+border:2px dashed #667eea;
+padding:40px;
+text-align:center;
+background:white;
+margin-top:20px;
+}
+
+button{
+padding:10px 20px;
+background:#667eea;
+color:white;
+border:none;
+cursor:pointer;
+margin-top:10px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div id="loginBox">
+
+<h2>Enter Password</h2>
+
+<input type="password" id="passInput" placeholder="Password"
+style="padding:10px;font-size:16px;margin-bottom:10px;">
+
+<button onclick="checkPassword()">Enter</button>
+
+<p id="errorMsg" style="color:red;"></p>
+
+</div>
+
+<h2>Amazon Label Tool</h2>
+
+<input type="file" id="pdfUpload">
+
+<div id="dropZone">
+Drag & Drop Amazon PDF Here
+</div>
+
+<br>
+
+<button onclick="processPDF()">Generate Labels</button>
+<button onclick="downloadSummary()">Download Summary Excel</button>
+
+<p id="status"></p>
+
+<script>
+
+function checkPassword(){
+
+let pass=document.getElementById("passInput").value
+
+if(pass==="1234"){
+document.getElementById("loginBox").style.display="none"
+}else{
+document.getElementById("errorMsg").innerText="Wrong Password"
+}
+
+}
+
+let pdfBuffer
+let skuMap={}
+let summary=[]
+let serial=1
+
+document.getElementById("pdfUpload").addEventListener("change",function(e){
+
+let file=e.target.files[0]
+
+let reader=new FileReader()
+
+reader.onload=function(){
+pdfBuffer=this.result
+document.getElementById("status").innerText="PDF Loaded"
+}
+
+reader.readAsArrayBuffer(file)
+
+})
+
+const dropZone=document.getElementById("dropZone")
+
+dropZone.addEventListener("dragover",e=>{
+e.preventDefault()
+})
+
+dropZone.addEventListener("drop",e=>{
+e.preventDefault()
+
+let file=e.dataTransfer.files[0]
+
+let reader=new FileReader()
+
+reader.onload=function(){
+pdfBuffer=this.result
+document.getElementById("status").innerText="PDF Loaded"
+}
+
+reader.readAsArrayBuffer(file)
+
+})
+
+async function loadCSV(){
+
+let response=await fetch("sku_map.csv")
+let text=await response.text()
+
+let rows=text.split("\n")
+
+rows.slice(1).forEach(r=>{
+
+let col=r.split(",")
+
+if(col.length>=2){
+
+let sku=col[0].trim()
+let rep=col[1].trim()
+
+if(!skuMap[sku]){
+skuMap[sku]=[]
+}
+
+skuMap[sku].push(rep)
+
+}
+
+})
+
+}
+
+loadCSV()
+
+async function processPDF(){
+
+summary=[]
+serial=1
+
+const loadingTask = pdfjsLib.getDocument({data: pdfBuffer})
+const pdf = await loadingTask.promise
+
+const newPdf = await PDFLib.PDFDocument.create()
+const originalPdf=await PDFLib.PDFDocument.load(pdfBuffer)
+
+let currentLabel=null
 
 for(let i=1;i<=pdf.numPages;i++){
 
 const page = await pdf.getPage(i)
 const textContent = await page.getTextContent()
+
 let text=textContent.items.map(i=>i.str).join(" ")
 
 if(text.includes("Order ID")){
 
-currentLabel = i-1
+currentLabel=i-1
 
 }
-
-else{
 
 let skuMatches=[...text.matchAll(/\(\s*([A-Z0-9\-]+)\s*\)/g)]
 
@@ -46,6 +230,14 @@ let names=replacements.join(", ")
 
 lines.push(`${names} ×${qty} (${pcs})`)
 
+summary.push({
+sno:serial++,
+sku:sku,
+replacement:names,
+qty:qty,
+pcs:pcs
+})
+
 }
 
 const [copiedPage]=await newPdf.copyPages(originalPdf,[currentLabel])
@@ -74,3 +266,42 @@ currentLabel=null
 }
 
 }
+
+const pdfBytes=await newPdf.save()
+
+let blob=new Blob([pdfBytes],{type:"application/pdf"})
+
+let link=document.createElement("a")
+
+link.href=URL.createObjectURL(blob)
+
+link.download="labels.pdf"
+
+link.click()
+
+document.getElementById("status").innerText="Labels Generated"
+
+}
+
+function downloadSummary(){
+
+let data=[["S.No","SKU","Replacement","Qty","Total PCS"]]
+
+summary.forEach(r=>{
+data.push([r.sno,r.sku,r.replacement,r.qty,r.pcs])
+})
+
+let ws=XLSX.utils.aoa_to_sheet(data)
+
+let wb=XLSX.utils.book_new()
+
+XLSX.utils.book_append_sheet(wb,ws,"Summary")
+
+XLSX.writeFile(wb,"packing_summary.xlsx")
+
+}
+
+</script>
+
+</body>
+</html>
