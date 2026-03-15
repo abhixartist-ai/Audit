@@ -1,37 +1,40 @@
-<!DOCTYPE html><html>
-<head><title>Amazon Label Tool</title><script>
+<!DOCTYPE html>
+<html>
+<head>
 
-// PASSWORD LOCK
+<title>Amazon Label Tool</title>
 
-(function(){
-
-let t=new Date()
-
-let d=String(t.getDate()).padStart(2,'0')
-let m=String(t.getMonth()+1).padStart(2,'0')
-
-let correct=d+m
-
-let p=prompt("Enter Password")
-
-if(p!==correct){
-
-document.write("<h2 style='text-align:center;margin-top:120px;font-family:Arial'>Access Denied</h2>")
-throw new Error("Blocked")
-
-}
-
-})()
-
-</script><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script><script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+<script>
 pdfjsLib.GlobalWorkerOptions.workerSrc =
 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
-</script><script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script><style>
+</script>
+
+<script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<style>
 
 body{
 font-family:Arial;
 padding:30px;
 background:#f4f6ff;
+}
+
+/* login screen */
+
+#loginBox{
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:#f4f6ff;
+display:flex;
+justify-content:center;
+align-items:center;
+flex-direction:column;
+z-index:9999;
 }
 
 #dropZone{
@@ -48,23 +51,71 @@ background:#667eea;
 color:white;
 border:none;
 cursor:pointer;
-margin-right:10px;
 margin-top:10px;
 }
 
-</style></head><body><h2>Amazon Label Tool</h2><input type="file" id="pdfUpload"><div id="dropZone">
+</style>
+
+</head>
+
+<body>
+
+<!-- PASSWORD SCREEN -->
+
+<div id="loginBox">
+
+<h2>Enter Password</h2>
+
+<input type="password" id="passInput" placeholder="Password"
+style="padding:10px;font-size:16px;margin-bottom:10px;">
+
+<button onclick="checkPassword()">Enter</button>
+
+<p id="errorMsg" style="color:red;"></p>
+
+</div>
+
+<h2>Amazon Label Tool</h2>
+
+<input type="file" id="pdfUpload">
+
+<div id="dropZone">
 Drag & Drop Amazon PDF Here
-</div><br><button onclick="processPDF()">Generate Labels</button>
+</div>
+
+<br>
+
+<button onclick="processPDF()">Generate Labels</button>
 <button onclick="downloadSummary()">Download Summary Excel</button>
 
-<p id="status"></p><script>
+<p id="status"></p>
+
+<script>
+
+/* PASSWORD CHECK */
+
+function checkPassword(){
+
+let pass=document.getElementById("passInput").value
+
+if(pass==="1234"){
+
+document.getElementById("loginBox").style.display="none"
+
+}else{
+
+document.getElementById("errorMsg").innerText="Wrong Password"
+
+}
+
+}
 
 let pdfBuffer
 let skuMap={}
 let summary=[]
 let serial=1
 
-// FILE UPLOAD
+/* upload */
 
 document.getElementById("pdfUpload").addEventListener("change",function(e){
 
@@ -81,7 +132,7 @@ reader.readAsArrayBuffer(file)
 
 })
 
-// DRAG DROP
+/* drag drop */
 
 const dropZone=document.getElementById("dropZone")
 
@@ -105,7 +156,7 @@ reader.readAsArrayBuffer(file)
 
 })
 
-// LOAD CSV
+/* load CSV */
 
 async function loadCSV(){
 
@@ -137,8 +188,6 @@ skuMap[sku].push(rep)
 
 loadCSV()
 
-// PROCESS PDF
-
 async function processPDF(){
 
 summary=[]
@@ -160,20 +209,14 @@ if(text.includes("Tax Invoice")){
 
 let labelIndex=i-2
 
-// FIXED SKU DETECTION
-
-let skuMatches=[...text.matchAll(/[A-Z0-9\-]{5,}/g)]
-
-// QTY DETECT
-
+let skuMatches=[...text.matchAll(/\(\s*([A-Z0-9\-]+)\s*\)/g)]
 let qtyMatches=[...text.matchAll(/₹[\d\.]+\s+(\d+)\s+₹/g)]
 
 let lines=[]
 
 for(let k=0;k<skuMatches.length;k++){
 
-let sku=skuMatches[k][0]
-
+let sku=skuMatches[k][1]
 let qty=qtyMatches[k] ? parseInt(qtyMatches[k][1]) : 1
 
 let replacements=skuMap[sku] || [sku]
@@ -205,8 +248,6 @@ pcs:pcs
 
 }
 
-// COPY LABEL PAGE
-
 if(labelIndex>=0){
 
 const originalPdf=await PDFLib.PDFDocument.load(pdfBuffer)
@@ -217,8 +258,6 @@ newPdf.addPage(copiedPage)
 
 let pages=newPdf.getPages()
 let lastPage=pages[pages.length-1]
-
-// PRINT POSITION
 
 let y=180
 
@@ -240,8 +279,6 @@ y-=16
 
 }
 
-// SAVE PDF
-
 const pdfBytes=await newPdf.save()
 
 let blob=new Blob([pdfBytes],{type:"application/pdf"})
@@ -257,8 +294,6 @@ link.click()
 document.getElementById("status").innerText="Labels Generated"
 
 }
-
-// DOWNLOAD EXCEL
 
 function downloadSummary(){
 
@@ -278,5 +313,7 @@ XLSX.writeFile(wb,"packing_summary.xlsx")
 
 }
 
-</script></body>
+</script>
+
+</body>
 </html>
