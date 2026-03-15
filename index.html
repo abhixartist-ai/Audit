@@ -62,7 +62,8 @@ margin-top:10px;
 
 <h2>Enter Password</h2>
 
-<input type="password" id="passInput" placeholder="Password" style="padding:10px;font-size:16px;margin-bottom:10px;">
+<input type="password" id="passInput" placeholder="Password"
+style="padding:10px;font-size:16px;margin-bottom:10px;">
 
 <button onclick="checkPassword()">Enter</button>
 
@@ -104,6 +105,7 @@ let pdfBuffer
 let skuMap={}
 let summary=[]
 let serial=1
+let orderNumber=1
 
 
 document.getElementById("pdfUpload").addEventListener("change",function(e){
@@ -181,6 +183,7 @@ async function processPDF(){
 
 summary=[]
 serial=1
+orderNumber=1
 
 const loadingTask = pdfjsLib.getDocument({data: pdfBuffer})
 const pdf = await loadingTask.promise
@@ -209,7 +212,7 @@ let invoiceText = invoiceTextContent.items.map(i=>i.str).join(" ")
 if(!invoiceText.includes("Tax Invoice")) continue
 
 
-let skuMatches=[...invoiceText.matchAll(/\(\s*([A-Z0-9\-]+)\s*\)/g)]
+let skuMatches=[...invoiceText.matchAll(/\(\s*([A-Z0-9\-\.]+)\s*\)/g)]
 let qtyMatches=[...invoiceText.matchAll(/₹[\d\.]+\s+(\d+)\s+₹/g)]
 
 let lines=[]
@@ -239,7 +242,7 @@ let names=replacements.join(", ")
 lines.push(`${names} ×${qty} (${pcs})`)
 
 summary.push({
-orderCount: k==0 ? 1 : "",
+order: k==0 ? orderNumber : "",
 sno:serial++,
 sku:sku,
 replacement:names,
@@ -248,6 +251,8 @@ pcs:pcs
 })
 
 }
+
+orderNumber++
 
 
 const [copiedPage]=await newPdf.copyPages(originalPdf,[i-1])
@@ -259,14 +264,14 @@ let lastPage=pages[pages.length-1]
 
 
 let startY = 180
-let lineHeight = 16
+let lineHeight = 14
 
 for (let j = 0; j < lines.length; j++) {
 
 let y = startY - (j * lineHeight)
 
 lastPage.drawText(lines[j], {
-x: 60,
+x: 50,
 y: y,
 size: 12
 })
@@ -296,10 +301,10 @@ document.getElementById("status").innerText="Labels Generated"
 
 function downloadSummary(){
 
-let data=[["Order Count","S.No","SKU","Replacement","Qty","Total PCS"]]
+let data=[["Order No","S.No","SKU","Replacement","Qty","Total PCS"]]
 
 summary.forEach(r=>{
-data.push([r.orderCount,r.sno,r.sku,r.replacement,r.qty,r.pcs])
+data.push([r.order,r.sno,r.sku,r.replacement,r.qty,r.pcs])
 })
 
 let ws=XLSX.utils.aoa_to_sheet(data)
