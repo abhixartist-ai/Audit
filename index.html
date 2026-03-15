@@ -1,6 +1,8 @@
 <!DOCTYPE html><html>
 <head><title>Amazon Label Tool</title><script>
 
+// PASSWORD LOCK
+
 (function(){
 
 let t=new Date()
@@ -62,6 +64,8 @@ let skuMap={}
 let summary=[]
 let serial=1
 
+// FILE UPLOAD
+
 document.getElementById("pdfUpload").addEventListener("change",function(e){
 
 let file=e.target.files[0]
@@ -76,6 +80,8 @@ document.getElementById("status").innerText="PDF Loaded"
 reader.readAsArrayBuffer(file)
 
 })
+
+// DRAG DROP
 
 const dropZone=document.getElementById("dropZone")
 
@@ -98,6 +104,8 @@ document.getElementById("status").innerText="PDF Loaded"
 reader.readAsArrayBuffer(file)
 
 })
+
+// LOAD CSV
 
 async function loadCSV(){
 
@@ -129,6 +137,8 @@ skuMap[sku].push(rep)
 
 loadCSV()
 
+// PROCESS PDF
+
 async function processPDF(){
 
 summary=[]
@@ -150,14 +160,20 @@ if(text.includes("Tax Invoice")){
 
 let labelIndex=i-2
 
-let skuMatches=[...text.matchAll(/\s*([A-Z0-9\-]+)\s*/g)]
+// FIXED SKU DETECTION
+
+let skuMatches=[...text.matchAll(/[A-Z0-9\-]{5,}/g)]
+
+// QTY DETECT
+
 let qtyMatches=[...text.matchAll(/₹[\d\.]+\s+(\d+)\s+₹/g)]
 
 let lines=[]
 
 for(let k=0;k<skuMatches.length;k++){
 
-let sku=skuMatches[k][1]
+let sku=skuMatches[k][0]
+
 let qty=qtyMatches[k] ? parseInt(qtyMatches[k][1]) : 1
 
 let replacements=skuMap[sku] || [sku]
@@ -189,6 +205,8 @@ pcs:pcs
 
 }
 
+// COPY LABEL PAGE
+
 if(labelIndex>=0){
 
 const originalPdf=await PDFLib.PDFDocument.load(pdfBuffer)
@@ -199,6 +217,8 @@ newPdf.addPage(copiedPage)
 
 let pages=newPdf.getPages()
 let lastPage=pages[pages.length-1]
+
+// PRINT POSITION
 
 let y=180
 
@@ -220,6 +240,8 @@ y-=16
 
 }
 
+// SAVE PDF
+
 const pdfBytes=await newPdf.save()
 
 let blob=new Blob([pdfBytes],{type:"application/pdf"})
@@ -235,6 +257,8 @@ link.click()
 document.getElementById("status").innerText="Labels Generated"
 
 }
+
+// DOWNLOAD EXCEL
 
 function downloadSummary(){
 
