@@ -82,15 +82,15 @@ Drag & Drop PDF Here
 
 <br>
 
-<button onclick="processPDF()">Generate Amazon Labels</button>
-<button onclick="processFlipkart()">Flipkart Labels</button>
-<button onclick="downloadSummary()">Download Summary Excel</button>
+<button onclick="processPDF()">Print Amazon Labels</button>
+<button onclick="processFlipkart()">Print Flipkart Labels</button>
+<button onclick="downloadSummary()">Download Amazon Summary</button>
 
 <p id="status"></p>
 
 <script>
 
-/* DATE FORMAT dd-mm-yy */
+/* DATE FORMAT */
 
 let d = new Date()
 let day = String(d.getDate()).padStart(2,'0')
@@ -113,6 +113,7 @@ document.getElementById("errorMsg").innerText="Wrong Password"
 
 }
 
+
 /* ENTER LOGIN */
 
 document.getElementById("passInput").addEventListener("keydown",function(e){
@@ -122,6 +123,7 @@ checkPassword()
 }
 
 })
+
 
 /* ENTER GENERATE */
 
@@ -338,15 +340,15 @@ const pdfBytes=await newPdf.save()
 
 let blob=new Blob([pdfBytes],{type:"application/pdf"})
 
-let link=document.createElement("a")
+let url = URL.createObjectURL(blob)
 
-link.href=URL.createObjectURL(blob)
+let printWindow = window.open(url)
 
-link.download="Amazon_label_"+today+".pdf"
+printWindow.onload = function(){
+printWindow.print()
+}
 
-link.click()
-
-document.getElementById("status").innerText="Amazon Labels Generated"
+document.getElementById("status").innerText="Amazon Labels Ready"
 
 }
 
@@ -383,15 +385,15 @@ const pdfBytes=await newPdf.save()
 
 let blob=new Blob([pdfBytes],{type:"application/pdf"})
 
-let link=document.createElement("a")
+let url = URL.createObjectURL(blob)
 
-link.href=URL.createObjectURL(blob)
+let printWindow = window.open(url)
 
-link.download="Flipkart_label_"+today+".pdf"
+printWindow.onload = function(){
+printWindow.print()
+}
 
-link.click()
-
-document.getElementById("status").innerText="Flipkart Labels Generated"
+document.getElementById("status").innerText="Flipkart Labels Ready"
 
 }
 
