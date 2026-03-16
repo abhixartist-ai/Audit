@@ -72,7 +72,7 @@ style="padding:10px;font-size:16px;margin-bottom:10px;">
 
 </div>
 
-<h2>Amazon Label Tool <span style="font-size:13px;color:#888;font-weight:normal;">  New Prospective Industries</span></h2>
+<h2>Amazon Label Tool <span style="font-size:13px;color:#888;font-weight:normal;">| Abhishek</span></h2>
 
 <input type="file" id="pdfUpload">
 
@@ -96,7 +96,8 @@ let d = new Date()
 let day = String(d.getDate()).padStart(2,'0')
 let month = String(d.getMonth()+1).padStart(2,'0')
 let year = String(d.getFullYear()).slice(-2)
-let today = day+"-"+month+"-"+year
+
+let today = day + "-" + month + "-" + year
 
 
 function checkPassword(){
@@ -115,14 +116,23 @@ document.getElementById("errorMsg").innerText="Wrong Password"
 /* ENTER LOGIN */
 
 document.getElementById("passInput").addEventListener("keydown",function(e){
-if(e.key==="Enter"){checkPassword()}
+
+if(e.key==="Enter"){
+checkPassword()
+}
+
 })
 
 /* ENTER GENERATE */
 
 document.addEventListener("keydown",function(e){
-if(e.key==="Enter" && pdfBuffer){processPDF()}
+
+if(e.key==="Enter" && pdfBuffer){
+processPDF()
+}
+
 })
+
 
 let pdfBuffer
 let skuMap={}
@@ -131,9 +141,11 @@ let serial=1
 let orderNumber=1
 let boldFont
 
+
 document.getElementById("pdfUpload").addEventListener("change",function(e){
 
 let file=e.target.files[0]
+
 let reader=new FileReader()
 
 reader.onload=function(){
@@ -144,6 +156,66 @@ document.getElementById("status").innerText="PDF Loaded (Press Enter)"
 reader.readAsArrayBuffer(file)
 
 })
+
+
+/* DRAG DROP */
+
+const dropZone=document.getElementById("dropZone")
+
+dropZone.addEventListener("dragover",e=>{
+e.preventDefault()
+})
+
+dropZone.addEventListener("drop",e=>{
+
+e.preventDefault()
+
+let file=e.dataTransfer.files[0]
+
+let reader=new FileReader()
+
+reader.onload=function(){
+pdfBuffer=this.result
+document.getElementById("status").innerText="PDF Loaded (Press Enter)"
+}
+
+reader.readAsArrayBuffer(file)
+
+})
+
+
+/* LOAD CSV */
+
+async function loadCSV(){
+
+let response=await fetch("sku_map.csv")
+let text=await response.text()
+
+let rows=text.split("\n")
+
+rows.slice(1).forEach(r=>{
+
+let col=r.split(",")
+
+if(col.length>=2){
+
+let sku=col[0].trim()
+let rep=col[1].trim()
+
+if(!skuMap[sku]){
+skuMap[sku]=[]
+}
+
+skuMap[sku].push(rep)
+
+}
+
+})
+
+}
+
+loadCSV()
+
 
 
 /* AMAZON LABEL PROCESS */
@@ -166,18 +238,81 @@ const originalPdf = await PDFLib.PDFDocument.load(pdfBuffer)
 
 for(let i=1;i<=pdf.numPages;i++){
 
+const page = await pdf.getPage(i)
+const textContent = await page.getTextContent()
+
+let text=textContent.items.map(i=>i.str).join(" ")
+
+if(!text.includes("Tax Invoice")){
+
+let invoicePageNumber = i
+
+if(invoicePageNumber >= pdf.numPages) continue
+
+const invoicePage = await pdf.getPage(invoicePageNumber+1)
+const invoiceTextContent = await invoicePage.getTextContent()
+
+let invoiceText = invoiceTextContent.items.map(i=>i.str).join(" ")
+
+if(!invoiceText.includes("Tax Invoice")) continue
+
+let skuMatches=[...invoiceText.matchAll(/\(\s*([A-Z0-9\-\.]+)\s*\)/g)]
+let qtyMatches=[...invoiceText.matchAll(/₹[\d\.]+\s+(\d+)\s+₹/g)]
+
+let items=[]
+
+for(let k=0;k<skuMatches.length;k++){
+
+let sku=skuMatches[k][1]
+let qty=qtyMatches[k] ? parseInt(qtyMatches[k][1]) : 1
+
+let replacements=skuMap[sku] || [sku]
+
+let packTotal=0
+
+replacements.forEach(rep=>{
+let packMatch=rep.match(/(\d+)$/)
+let pack=packMatch ? parseInt(packMatch[1]) : 1
+packTotal+=pack
+})
+
+let pcs=packTotal*qty
+
+items.push({
+name:replacements.join(", "),
+qty:qty,
+pcs:pcs
+})
+
+summary.push({
+order:k==0?orderNumber:"",
+sno:serial++,
+sku:sku,
+replacement:replacements.join(", "),
+qty:qty,
+pcs:pcs
+})
+
+}
+
+orderNumber++
+
 const [copiedPage]=await newPdf.copyPages(originalPdf,[i-1])
+
 newPdf.addPage(copiedPage)
 
 let pages=newPdf.getPages()
 let lastPage=pages[pages.length-1]
 
-let text="Amazon Order"
+let startY = 180
+let lineHeight = 14
 
-let y=180
+for(let j=0;j<items.length;j++){
 
-let leftText = "SampleSKU ×1      "
-let pcsText = "(4)"
+let y=startY-(j*lineHeight)
+
+let leftText = items[j].name + " ×" + items[j].qty + "      "
+let pcsText = "(" + items[j].pcs + ")"
 
 lastPage.drawText(leftText,{
 x:50,
@@ -195,18 +330,26 @@ font:boldFont
 
 }
 
+}
+
+}
+
 const pdfBytes=await newPdf.save()
 
 let blob=new Blob([pdfBytes],{type:"application/pdf"})
+
 let link=document.createElement("a")
 
 link.href=URL.createObjectURL(blob)
+
 link.download="Amazon_label_"+today+".pdf"
+
 link.click()
 
 document.getElementById("status").innerText="Amazon Labels Generated"
 
 }
+
 
 
 /* FLIPKART LABEL CROP */
@@ -239,10 +382,13 @@ newPdf.addPage(page)
 const pdfBytes=await newPdf.save()
 
 let blob=new Blob([pdfBytes],{type:"application/pdf"})
+
 let link=document.createElement("a")
 
 link.href=URL.createObjectURL(blob)
+
 link.download="Flipkart_label_"+today+".pdf"
+
 link.click()
 
 document.getElementById("status").innerText="Flipkart Labels Generated"
@@ -250,7 +396,8 @@ document.getElementById("status").innerText="Flipkart Labels Generated"
 }
 
 
-/* SUMMARY EXCEL */
+
+/* EXCEL SUMMARY */
 
 function downloadSummary(){
 
@@ -261,6 +408,7 @@ data.push([r.order,r.sno,r.sku,r.replacement,r.qty,r.pcs])
 })
 
 let ws=XLSX.utils.aoa_to_sheet(data)
+
 let wb=XLSX.utils.book_new()
 
 XLSX.utils.book_append_sheet(wb,ws,"Summary")
