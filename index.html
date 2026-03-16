@@ -71,7 +71,7 @@ style="padding:10px;font-size:16px;margin-bottom:10px;">
 
 </div>
 
-<h2>Amazon Label Tool</h2>
+<h2>Amazon Label Tool For New Prospective</h2>
 
 <input type="file" id="pdfUpload">
 
@@ -101,6 +101,27 @@ document.getElementById("errorMsg").innerText="Wrong Password"
 
 }
 
+/* ENTER KEY FOR PASSWORD */
+
+document.getElementById("passInput").addEventListener("keydown",function(e){
+
+if(e.key==="Enter"){
+checkPassword()
+}
+
+})
+
+
+/* ENTER KEY FOR GENERATE LABEL */
+
+document.addEventListener("keydown",function(e){
+
+if(e.key==="Enter" && pdfBuffer){
+processPDF()
+}
+
+})
+
 let pdfBuffer
 let skuMap={}
 let summary=[]
@@ -117,7 +138,7 @@ let reader=new FileReader()
 
 reader.onload=function(){
 pdfBuffer=this.result
-document.getElementById("status").innerText="PDF Loaded"
+document.getElementById("status").innerText="PDF Loaded (Press Enter)"
 }
 
 reader.readAsArrayBuffer(file)
@@ -141,7 +162,7 @@ let reader=new FileReader()
 
 reader.onload=function(){
 pdfBuffer=this.result
-document.getElementById("status").innerText="PDF Loaded"
+document.getElementById("status").innerText="PDF Loaded (Press Enter)"
 }
 
 reader.readAsArrayBuffer(file)
@@ -264,7 +285,7 @@ newPdf.addPage(copiedPage)
 let pages=newPdf.getPages()
 let lastPage=pages[pages.length-1]
 
-let startY = 190
+let startY = 180
 let lineHeight = 14
 
 for(let j=0;j<items.length;j++){
