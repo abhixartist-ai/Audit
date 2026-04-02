@@ -1,442 +1,173 @@
-<!DOCTYPE html>
-<html>
+<!DOCTYPE html><html lang="en">
 <head>
-
-<title>Amazon Label Tool</title>
-
-<link rel="icon" type="image/png" href="favicon.png">
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-<script>
-pdfjsLib.GlobalWorkerOptions.workerSrc =
-'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
-</script>
-
-<script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-
-<style>
-
-body{
-font-family:Arial;
-padding:30px;
-background:#f4f6ff;
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Amazon Label Tool</title><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script><style>
+body {
+  margin: 0;
+  font-family: Arial;
+  background: #0f172a;
+  color: white;
 }
 
-#loginBox{
-position:fixed;
-top:0;
-left:0;
-width:100%;
-height:100%;
-background:#f4f6ff;
-display:flex;
-justify-content:center;
-align-items:center;
-flex-direction:column;
-z-index:9999;
+.card {
+  background: #1e293b;
+  margin: 15px;
+  padding: 20px;
+  border-radius: 15px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.5);
 }
 
-#dropZone{
-border:2px dashed #667eea;
-padding:40px;
-text-align:center;
-background:white;
-margin-top:20px;
+#dropZone {
+  border: 2px dashed #555;
+  padding: 40px;
+  text-align: center;
+  border-radius: 10px;
+  transition: 0.3s;
 }
 
-button{
-padding:10px 20px;
-background:#667eea;
-color:white;
-border:none;
-cursor:pointer;
-margin-top:10px;
+#dropZone.dragover { background: #334155; }
+#dropZone.uploaded { background: #065f46; }
+
+button {
+  margin: 10px;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 10px;
+  background: #6366f1;
+  color: white;
+  cursor: pointer;
 }
 
-</style>
-
-</head>
-
-<body>
-
-<div id="loginBox">
-
-<h2>Enter Password</h2>
-
-<input type="password" id="passInput"
-placeholder="Password"
-style="padding:10px;font-size:16px;margin-bottom:10px;">
-
-<button onclick="checkPassword()">Enter</button>
-
-<p id="errorMsg" style="color:red;"></p>
-
-</div>
-
-<h2>Amazon/Flipkart Label Tool <span style="font-size:13px;color:#888;">  New Prospective Industries</span></h2>
-
-<input type="file" id="pdfUpload">
-
-<div id="dropZone">
-Drag & Drop PDF Here
-</div>
-
-<br>
-
-<button onclick="processPDF()">Print Amazon Labels</button>
-<button onclick="processFlipkart()">Print Flipkart Labels</button>
-<button onclick="downloadSummary()">Download Amazon Summary</button>
-
-<p id="status"></p>
-
-<script>
-
-/* DATE FORMAT */
-
-let d = new Date()
-let day = String(d.getDate()).padStart(2,'0')
-let month = String(d.getMonth()+1).padStart(2,'0')
-let year = String(d.getFullYear()).slice(-2)
-
-let today = day + "-" + month + "-" + year
-
-
-/* PASSWORD */
-
-function checkPassword(){
-
-let pass=document.getElementById("passInput").value
-
-if(pass==="1234"){
-document.getElementById("loginBox").style.display="none"
-}
-else{
-document.getElementById("errorMsg").innerText="Wrong Password"
+#loader {
+  display: none;
+  text-align: center;
 }
 
+.menu {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 250px;
+  height: 100%;
+  background: #020617;
+  transform: translateX(-100%);
+  transition: 0.3s;
+  padding: 20px;
 }
 
-document.getElementById("passInput").addEventListener("keydown",function(e){
-if(e.key==="Enter"){
-checkPassword()
+.menu.active { transform: translateX(0); }
+
+.hamburger {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  font-size: 24px;
+  cursor: pointer;
 }
-})
+</style></head>
+<body><div class="hamburger" onclick="toggleMenu()">☰</div>
+<div class="menu" id="menu">
+  <h3>Menu</h3>
+  <p>Add more tools here</p>
+</div><div class="card" id="greeting"></div><div class="card">
+  <h3>Upload PDF</h3>
+  <div id="dropZone">Drag & Drop / Click</div>
+  <input type="file" id="fileInput" hidden accept="application/pdf">
+</div><div class="card">
+  <button onclick="processLabels()">Label PDF</button>
+  <button onclick="cropPDF()">Crop PDF</button>
+  <button onclick="exportExcel()">Export Excel</button>
+</div><div id="loader">Processing...</div><script>
+let pdfFile = null;
+let extractedData = [];
 
-
-let pdfBuffer
-let skuMap={}
-let summary=[]
-let serial=1
-let orderNumber=1
-let boldFont
-
-
-/* PDF UPLOAD */
-
-document.getElementById("pdfUpload").addEventListener("change",function(e){
-
-let file=e.target.files[0]
-
-let reader=new FileReader()
-
-reader.onload=function(){
-pdfBuffer=this.result
-document.getElementById("status").innerText="PDF Loaded"
-}
-
-reader.readAsArrayBuffer(file)
-
-})
-
-
-/* DRAG DROP */
-
-const dropZone=document.getElementById("dropZone")
-
-dropZone.addEventListener("dragover",e=>{
-e.preventDefault()
-})
-
-dropZone.addEventListener("drop",e=>{
-
-e.preventDefault()
-
-let file=e.dataTransfer.files[0]
-
-let reader=new FileReader()
-
-reader.onload=function(){
-pdfBuffer=this.result
-document.getElementById("status").innerText="PDF Loaded"
+function toggleMenu() {
+  document.getElementById("menu").classList.toggle("active");
 }
 
-reader.readAsArrayBuffer(file)
+function updateGreeting() {
+  let h = new Date().getHours();
+  let msg = "Good Evening";
+  if(h < 12) msg = "Good Morning";
+  else if(h < 18) msg = "Good Afternoon";
 
-})
+  let now = new Date();
+  document.getElementById("greeting").innerHTML = `
+    <h2>${msg}</h2>
+    <p>${now.toDateString()}</p>
+    <p>${now.toLocaleTimeString()}</p>
+  `;
+}
+updateGreeting();
 
+let dropZone = document.getElementById("dropZone");
+let fileInput = document.getElementById("fileInput");
 
-/* LOAD CSV */
+dropZone.onclick = () => fileInput.click();
 
-async function loadCSV(){
+fileInput.onchange = e => handleFile(e.target.files[0]);
 
-let response=await fetch("sku_map.csv")
-let text=await response.text()
+dropZone.ondragover = e => {
+  e.preventDefault();
+  dropZone.classList.add("dragover");
+};
 
-let rows=text.split("\n")
+dropZone.ondragleave = () => dropZone.classList.remove("dragover");
 
-rows.slice(1).forEach(r=>{
+dropZone.ondrop = e => {
+  e.preventDefault();
+  dropZone.classList.remove("dragover");
+  handleFile(e.dataTransfer.files[0]);
+};
 
-let col=r.split(",")
-
-if(col.length>=2){
-
-let sku=col[0].trim()
-let rep=col[1].trim()
-
-if(!skuMap[sku]){
-skuMap[sku]=[]
+function handleFile(file) {
+  pdfFile = file;
+  dropZone.classList.add("uploaded");
 }
 
-skuMap[sku].push(rep)
+async function processPDF() {
+  document.getElementById("loader").style.display = "block";
 
+  const reader = new FileReader();
+  reader.readAsArrayBuffer(pdfFile);
+
+  reader.onload = async function() {
+    const pdf = await pdfjsLib.getDocument({data: reader.result}).promise;
+    extractedData = [];
+
+    for(let i=1;i<=pdf.numPages;i++){
+      const page = await pdf.getPage(i);
+      const text = await page.getTextContent();
+      let str = text.items.map(t=>t.str).join(" ");
+
+      let orderId = str.match(/Order\s*ID[:\s]*([A-Z0-9-]+)/i)?.[1] || "";
+      let sku = str.match(/SKU[:\s]*([A-Z0-9-]+)/i)?.[1] || "";
+      let qty = str.match(/Qty[:\s]*(\d+)/i)?.[1] || 1;
+
+      extractedData.push({orderId, sku, qty});
+    }
+
+    document.getElementById("loader").style.display = "none";
+  }
 }
 
-})
+async function exportExcel() {
+  await processPDF();
 
+  let ws = XLSX.utils.json_to_sheet(extractedData);
+  let wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Data");
+  XLSX.writeFile(wb, "orders.xlsx");
 }
 
-loadCSV()
-
-
-
-/* AMAZON LABEL PROCESS */
-
-async function processPDF(){
-
-summary=[]
-serial=1
-orderNumber=1
-
-const loadingTask = pdfjsLib.getDocument({data: pdfBuffer})
-const pdf = await loadingTask.promise
-
-const newPdf = await PDFLib.PDFDocument.create()
-
-boldFont = await newPdf.embedFont(PDFLib.StandardFonts.HelveticaBold)
-const normalFont = await newPdf.embedFont(PDFLib.StandardFonts.Helvetica)
-
-const originalPdf = await PDFLib.PDFDocument.load(pdfBuffer)
-
-for(let i=1;i<=pdf.numPages;i++){
-
-const page = await pdf.getPage(i)
-const textContent = await page.getTextContent()
-
-let text=textContent.items.map(i=>i.str).join(" ")
-
-if(!text.includes("Tax Invoice")){
-
-let invoicePageNumber = i
-
-if(invoicePageNumber >= pdf.numPages) continue
-
-const invoicePage = await pdf.getPage(invoicePageNumber+1)
-const invoiceTextContent = await invoicePage.getTextContent()
-
-let invoiceText = invoiceTextContent.items.map(i=>i.str).join(" ")
-
-if(!invoiceText.includes("Tax Invoice")) continue
-
-let skuMatches=[...invoiceText.matchAll(/\(\s*([A-Z0-9\-\.]+)\s*\)/g)]
-let qtyMatches=[...invoiceText.matchAll(/₹[\d\.]+\s+(\d+)\s+₹/g)]
-
-let items=[]
-
-for(let k=0;k<skuMatches.length;k++){
-
-let sku=skuMatches[k][1]
-let qty=qtyMatches[k] ? parseInt(qtyMatches[k][1]) : 1
-
-let replacements=skuMap[sku] || [sku]
-
-let packTotal=0
-
-replacements.forEach(rep=>{
-let packMatch=rep.match(/(\d+)$/)
-let pack=packMatch ? parseInt(packMatch[1]) : 1
-packTotal+=pack
-})
-
-let pcs=packTotal*qty
-
-items.push({
-name:replacements.join(", "),
-qty:qty,
-pcs:pcs
-})
-
-summary.push({
-order:k==0?orderNumber:"",
-sno:serial++,
-sku:sku,
-replacement:replacements.join(", "),
-qty:qty,
-pcs:pcs
-})
-
+function processLabels(){
+  alert("Label processing logic yaha add karna hai (SKU replace + print)");
 }
 
-orderNumber++
-
-const [copiedPage]=await newPdf.copyPages(originalPdf,[i-1])
-
-newPdf.addPage(copiedPage)
-
-let pages=newPdf.getPages()
-let lastPage=pages[pages.length-1]
-
-let startY = 190
-let lineHeight = 14
-
-for(let j=0;j<items.length;j++){
-
-let y=startY-(j*lineHeight)
-
-let leftText = items[j].name + " ×" + items[j].qty + "      "
-let pcsText = "(" + items[j].pcs + ")"
-
-lastPage.drawText(leftText,{
-x:50,
-y:y,
-size:12,
-font:normalFont
-})
-
-lastPage.drawText(pcsText,{
-x:50 + leftText.length * 6,
-y:y,
-size:12,
-font:boldFont
-})
-
+function cropPDF(){
+  alert("Crop logic yaha add karna hai");
 }
 
-}
-
-}
-
-const pdfBytes=await newPdf.save()
-
-let blob=new Blob([pdfBytes],{type:"application/pdf"})
-let blobUrl = URL.createObjectURL(blob)
-
-let iframe = document.createElement("iframe")
-iframe.style.display="none"
-iframe.src = blobUrl
-
-document.body.appendChild(iframe)
-
-iframe.onload=function(){
-iframe.contentWindow.print()
-}
-
-document.getElementById("status").innerText="Amazon Labels Ready"
-
-}
-
-
-
-/* FLIPKART LABEL CROP */
-
-async function processFlipkart(){
-
-const loadingTask = pdfjsLib.getDocument({data: pdfBuffer})
-const pdf = await loadingTask.promise
-
-const newPdf = await PDFLib.PDFDocument.create()
-const originalPdf = await PDFLib.PDFDocument.load(pdfBuffer)
-
-for(let i=0;i<pdf.numPages;i++){
-
-const [page]=await newPdf.copyPages(originalPdf,[i])
-
-const {width,height}=page.getSize()
-
-page.setCropBox(
-185,
-height-385,
-410-185,
-385-25
-)
-
-newPdf.addPage(page)
-
-}
-
-const pdfBytes=await newPdf.save()
-
-let blob=new Blob([pdfBytes],{type:"application/pdf"})
-let blobUrl = URL.createObjectURL(blob)
-
-let iframe = document.createElement("iframe")
-iframe.style.display="none"
-iframe.src = blobUrl
-
-document.body.appendChild(iframe)
-
-iframe.onload=function(){
-iframe.contentWindow.print()
-}
-
-document.getElementById("status").innerText="Flipkart Labels Ready"
-
-}
-
-
-/* EXCEL SUMMARY */
-
-function downloadSummary(){
-
-let data=[["Order No","S.No","SKU","Replacement","Qty","Total PCS"]]
-
-summary.forEach(r=>{
-data.push([r.order,r.sno,r.sku,r.replacement,r.qty,r.pcs])
-})
-
-let ws=XLSX.utils.aoa_to_sheet(data)
-
-let wb=XLSX.utils.book_new()
-
-XLSX.utils.book_append_sheet(wb,ws,"Summary")
-
-XLSX.writeFile(wb,"Amazon_summary_"+today+".xlsx")
-
-}
-
-
-/* KEYBOARD SHORTCUTS */
-
-document.addEventListener("keydown", function(e){
-
-if(e.ctrlKey && e.shiftKey && e.key.toLowerCase()=="a"){
-e.preventDefault()
-if(pdfBuffer){processPDF()}
-}
-
-if(e.ctrlKey && e.shiftKey && e.key.toLowerCase()=="f"){
-e.preventDefault()
-if(pdfBuffer){processFlipkart()}
-}
-
-if(e.ctrlKey && e.shiftKey && e.key.toLowerCase()=="e"){
-e.preventDefault()
-downloadSummary()
-}
-
-})
-
-</script>
-
-</body>
+</script></body>
 </html>
