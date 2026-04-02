@@ -16,15 +16,26 @@ button {margin:10px;padding:12px 20px;border:none;border-radius:10px;background:
 </style></head>
 <body><div class="hamburger" onclick="toggleMenu()">☰</div>
 <div class="menu" id="menu"><h3>Menu</h3></div><div class="card" id="greeting"></div><div class="card">
-<h3>Upload PDF + SKU Map CSV</h3>
+<h3>Upload PDF</h3>
 <div id="dropZone">Drag & Drop PDF</div>
 <input type="file" id="pdfInput" hidden accept="application/pdf">
-<br><br>
-<input type="file" id="csvInput" accept=".csv">
 </div><div class="card">
-<button onclick="processAll()">Process & Export Excel</button>
+<button onclick="labelOnly()">1. Label Generate</button>
+<button onclick="cropPDF()">2. Crop PDF</button>
+<button onclick="exportExcel()">3. Export Excel</button>
 </div><div id="loader">Processing...</div><script>
 let pdfFile, skuMap = {};
+
+// 🔥 AUTO LOAD CSV FROM GITHUB
+fetch("sku_map.csv")
+.then(res=>res.text())
+.then(csv=>{
+let data = Papa.parse(csv, {header:true}).data;
+data.forEach(r=>{
+if(r.SKU) skuMap[r.SKU.trim()] = r.REPLACEMENT;
+});
+console.log("SKU MAP LOADED", skuMap);
+});
 
 function toggleMenu(){document.getElementById("menu").classList.toggle("active")}
 
@@ -46,24 +57,10 @@ dz.ondrop=e=>{e.preventDefault();dz.classList.remove("drag");loadPDF(e.dataTrans
 
 function loadPDF(f){pdfFile=f;dz.classList.add("done")}
 
-document.getElementById("csvInput").onchange=e=>{
-Papa.parse(e.target.files[0],{
-header:true,
-complete:r=>{
-r.data.forEach(row=>{
-if(row.SKU) skuMap[row.SKU.trim()]=row.REPLACEMENT
-})
-}
-})
-}
-
-async function processAll(){
-if(!pdfFile)return alert("Upload PDF first");
-
-document.getElementById("loader").style.display="block";
-
+async function readPDF(){
 let reader=new FileReader();
 reader.readAsArrayBuffer(pdfFile);
+return new Promise(resolve=>{
 reader.onload=async function(){
 let pdf=await pdfjsLib.getDocument({data:reader.result}).promise;
 let rows=[];
@@ -90,32 +87,62 @@ let m=replacement.match(/-(\d+)/);
 if(m) pack=parseInt(m[1]);
 
 rows.push({
-"Order ID":orderId,
-"Ship Date":shipDate,
-"Order Date":orderDate,
-"SKU":sku,
-"Replacement":replacement,
-"Qty":qty,
-"Pack*Qty":pack*qty
-})
+orderId, shipDate, orderDate, sku, replacement, qty, pcs:pack*qty
+});
 }
+}
+resolve(rows);
+}
+});
 }
 
-let ws=XLSX.utils.json_to_sheet(rows);
+// 1️⃣ LABEL FUNCTION
+async function labelOnly(){
+if(!pdfFile) return alert("Upload PDF first");
+document.getElementById("loader").style.display="block";
+
+let rows = await readPDF();
+
+let text="";
+rows.forEach(r=>{
+text += `${r.replacement} (${r.pcs} pcs)\n`;
+});
+
+console.log("LABEL TEXT:\n", text);
+alert("Label text console me generate ho gaya");
+
+document.getElementById("loader").style.display="none";
+}
+
+// 2️⃣ CROP FUNCTION
+function cropPDF(){
+alert("Crop feature next upgrade me add hoga (exact center crop)");
+}
+
+// 3️⃣ EXCEL EXPORT
+async function exportExcel(){
+if(!pdfFile) return alert("Upload PDF first");
+document.getElementById("loader").style.display="block";
+
+let rows = await readPDF();
+
+let formatted = rows.map(r=>({
+"Order ID":r.orderId,
+"Ship Date":r.shipDate,
+"Order Date":r.orderDate,
+"SKU":r.sku,
+"Replacement":r.replacement,
+"Qty":r.qty,
+"Pack*Qty":r.pcs
+}));
+
+let ws=XLSX.utils.json_to_sheet(formatted);
 let wb=XLSX.utils.book_new();
 XLSX.utils.book_append_sheet(wb,ws,"Orders");
 XLSX.writeFile(wb,"Amazon_Data.xlsx");
 
-// LABEL PRINT TEXT
-let labelText="";
-rows.forEach(r=>{
-labelText+=`${r.Replacement} (${r["Pack*Qty"]} pcs)\n`
-})
-console.log(labelText);
-
 
 document.getElementById("loader").style.display="none";
-}
 }
 
 </script></body>
