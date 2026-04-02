@@ -2,171 +2,120 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Amazon Label Tool</title><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script><style>
-body {
-  margin: 0;
-  font-family: Arial;
-  background: #0f172a;
-  color: white;
-}
-
-.card {
-  background: #1e293b;
-  margin: 15px;
-  padding: 20px;
-  border-radius: 15px;
-  box-shadow: 0 0 10px rgba(0,0,0,0.5);
-}
-
-#dropZone {
-  border: 2px dashed #555;
-  padding: 40px;
-  text-align: center;
-  border-radius: 10px;
-  transition: 0.3s;
-}
-
-#dropZone.dragover { background: #334155; }
-#dropZone.uploaded { background: #065f46; }
-
-button {
-  margin: 10px;
-  padding: 12px 20px;
-  border: none;
-  border-radius: 10px;
-  background: #6366f1;
-  color: white;
-  cursor: pointer;
-}
-
-#loader {
-  display: none;
-  text-align: center;
-}
-
-.menu {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 250px;
-  height: 100%;
-  background: #020617;
-  transform: translateX(-100%);
-  transition: 0.3s;
-  padding: 20px;
-}
-
-.menu.active { transform: translateX(0); }
-
-.hamburger {
-  position: fixed;
-  top: 10px;
-  left: 10px;
-  font-size: 24px;
-  cursor: pointer;
-}
+<title>Amazon Label Tool Pro</title><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script><style>
+body {margin:0;font-family:Arial;background:#0f172a;color:white}
+.card {background:#1e293b;margin:15px;padding:20px;border-radius:15px}
+#dropZone {border:2px dashed #555;padding:40px;text-align:center;border-radius:10px;transition:0.3s}
+#dropZone.drag {background:#334155}
+#dropZone.done {background:#065f46}
+button {margin:10px;padding:12px 20px;border:none;border-radius:10px;background:#6366f1;color:white;cursor:pointer}
+#loader {display:none;text-align:center}
+.menu {position:fixed;top:0;left:0;width:250px;height:100%;background:#020617;transform:translateX(-100%);transition:0.3s;padding:20px}
+.menu.active {transform:translateX(0)}
+.hamburger {position:fixed;top:10px;left:10px;font-size:24px;cursor:pointer}
 </style></head>
 <body><div class="hamburger" onclick="toggleMenu()">☰</div>
-<div class="menu" id="menu">
-  <h3>Menu</h3>
-  <p>Add more tools here</p>
-</div><div class="card" id="greeting"></div><div class="card">
-  <h3>Upload PDF</h3>
-  <div id="dropZone">Drag & Drop / Click</div>
-  <input type="file" id="fileInput" hidden accept="application/pdf">
+<div class="menu" id="menu"><h3>Menu</h3></div><div class="card" id="greeting"></div><div class="card">
+<h3>Upload PDF + SKU Map CSV</h3>
+<div id="dropZone">Drag & Drop PDF</div>
+<input type="file" id="pdfInput" hidden accept="application/pdf">
+<br><br>
+<input type="file" id="csvInput" accept=".csv">
 </div><div class="card">
-  <button onclick="processLabels()">Label PDF</button>
-  <button onclick="cropPDF()">Crop PDF</button>
-  <button onclick="exportExcel()">Export Excel</button>
+<button onclick="processAll()">Process & Export Excel</button>
 </div><div id="loader">Processing...</div><script>
-let pdfFile = null;
-let extractedData = [];
+let pdfFile, skuMap = {};
 
-function toggleMenu() {
-  document.getElementById("menu").classList.toggle("active");
+function toggleMenu(){document.getElementById("menu").classList.toggle("active")}
+
+function greeting(){
+let h=new Date().getHours(),msg="Good Evening";
+if(h<12)msg="Good Morning";else if(h<18)msg="Good Afternoon";
+let now=new Date();
+document.getElementById("greeting").innerHTML=`<h2>${msg}</h2><p>${now.toDateString()}</p><p>${now.toLocaleTimeString()}</p>`
+}
+greeting();
+
+let dz=document.getElementById("dropZone"),pdfInput=document.getElementById("pdfInput");
+dz.onclick=()=>pdfInput.click();
+pdfInput.onchange=e=>loadPDF(e.target.files[0]);
+
+dz.ondragover=e=>{e.preventDefault();dz.classList.add("drag")}
+dz.ondragleave=()=>dz.classList.remove("drag")
+dz.ondrop=e=>{e.preventDefault();dz.classList.remove("drag");loadPDF(e.dataTransfer.files[0])}
+
+function loadPDF(f){pdfFile=f;dz.classList.add("done")}
+
+document.getElementById("csvInput").onchange=e=>{
+Papa.parse(e.target.files[0],{
+header:true,
+complete:r=>{
+r.data.forEach(row=>{
+if(row.SKU) skuMap[row.SKU.trim()]=row.REPLACEMENT
+})
+}
+})
 }
 
-function updateGreeting() {
-  let h = new Date().getHours();
-  let msg = "Good Evening";
-  if(h < 12) msg = "Good Morning";
-  else if(h < 18) msg = "Good Afternoon";
+async function processAll(){
+if(!pdfFile)return alert("Upload PDF first");
 
-  let now = new Date();
-  document.getElementById("greeting").innerHTML = `
-    <h2>${msg}</h2>
-    <p>${now.toDateString()}</p>
-    <p>${now.toLocaleTimeString()}</p>
-  `;
+document.getElementById("loader").style.display="block";
+
+let reader=new FileReader();
+reader.readAsArrayBuffer(pdfFile);
+reader.onload=async function(){
+let pdf=await pdfjsLib.getDocument({data:reader.result}).promise;
+let rows=[];
+
+for(let i=1;i<=pdf.numPages;i++){
+let page=await pdf.getPage(i);
+let txt=await page.getTextContent();
+let str=txt.items.map(x=>x.str).join(" ");
+
+let orderId=(str.match(/Order\s*ID[:\s]*([A-Z0-9-]+)/i)||[])[1]||"";
+let shipDate=(str.match(/Ship\s*Date[:\s]*([0-9\/-]+)/i)||[])[1]||"";
+let orderDate=(str.match(/Order\s*Date[:\s]*([0-9\/-]+)/i)||[])[1]||"";
+
+let skuMatches=[...str.matchAll(/SKU[:\s]*([A-Z0-9-]+)/gi)];
+let qtyMatches=[...str.matchAll(/Qty[:\s]*(\d+)/gi)];
+
+for(let j=0;j<skuMatches.length;j++){
+let sku=skuMatches[j][1];
+let qty=parseInt(qtyMatches[j]?.[1]||1);
+let replacement=skuMap[sku]||"";
+
+let pack=1;
+let m=replacement.match(/-(\d+)/);
+if(m) pack=parseInt(m[1]);
+
+rows.push({
+"Order ID":orderId,
+"Ship Date":shipDate,
+"Order Date":orderDate,
+"SKU":sku,
+"Replacement":replacement,
+"Qty":qty,
+"Pack*Qty":pack*qty
+})
 }
-updateGreeting();
-
-let dropZone = document.getElementById("dropZone");
-let fileInput = document.getElementById("fileInput");
-
-dropZone.onclick = () => fileInput.click();
-
-fileInput.onchange = e => handleFile(e.target.files[0]);
-
-dropZone.ondragover = e => {
-  e.preventDefault();
-  dropZone.classList.add("dragover");
-};
-
-dropZone.ondragleave = () => dropZone.classList.remove("dragover");
-
-dropZone.ondrop = e => {
-  e.preventDefault();
-  dropZone.classList.remove("dragover");
-  handleFile(e.dataTransfer.files[0]);
-};
-
-function handleFile(file) {
-  pdfFile = file;
-  dropZone.classList.add("uploaded");
-}
-
-async function processPDF() {
-  document.getElementById("loader").style.display = "block";
-
-  const reader = new FileReader();
-  reader.readAsArrayBuffer(pdfFile);
-
-  reader.onload = async function() {
-    const pdf = await pdfjsLib.getDocument({data: reader.result}).promise;
-    extractedData = [];
-
-    for(let i=1;i<=pdf.numPages;i++){
-      const page = await pdf.getPage(i);
-      const text = await page.getTextContent();
-      let str = text.items.map(t=>t.str).join(" ");
-
-      let orderId = str.match(/Order\s*ID[:\s]*([A-Z0-9-]+)/i)?.[1] || "";
-      let sku = str.match(/SKU[:\s]*([A-Z0-9-]+)/i)?.[1] || "";
-      let qty = str.match(/Qty[:\s]*(\d+)/i)?.[1] || 1;
-
-      extractedData.push({orderId, sku, qty});
-    }
-
-    document.getElementById("loader").style.display = "none";
-  }
 }
 
-async function exportExcel() {
-  await processPDF();
+let ws=XLSX.utils.json_to_sheet(rows);
+let wb=XLSX.utils.book_new();
+XLSX.utils.book_append_sheet(wb,ws,"Orders");
+XLSX.writeFile(wb,"Amazon_Data.xlsx");
 
-  let ws = XLSX.utils.json_to_sheet(extractedData);
-  let wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Data");
-  XLSX.writeFile(wb, "orders.xlsx");
+// LABEL PRINT TEXT
+let labelText="";
+rows.forEach(r=>{
+labelText+=`${r.Replacement} (${r["Pack*Qty"]} pcs)\n`
+})
+console.log(labelText);
+
+
+document.getElementById("loader").style.display="none";
 }
-
-function processLabels(){
-  alert("Label processing logic yaha add karna hai (SKU replace + print)");
-}
-
-function cropPDF(){
-  alert("Crop logic yaha add karna hai");
 }
 
 </script></body>
