@@ -173,6 +173,7 @@ hideLoader()
 r.readAsArrayBuffer(file)
 }
 
+/* SKU MAP */
 fetch("sku_map.csv")
 .then(r=>r.text())
 .then(t=>{
@@ -185,6 +186,7 @@ skuMap[c[0]].push(c[1])
 })
 })
 
+/* AMAZON */
 async function processPDF(){
 if(!pdfBuffer){alert("Upload PDF");return}
 
@@ -204,9 +206,9 @@ if(!text.includes("Tax Invoice")){
 const inv=await pdf.getPage(i+1)
 const invText=(await inv.getTextContent()).items.map(x=>x.str).join(" ")
 
-/* ORDER ID */
-let orderIdMatch = invText.match(/Order\s*ID[:\s]*([A-Z0-9-]+)/i)
-let orderId = orderIdMatch ? orderIdMatch[1] : "NA"
+/* ✅ ORDER NUMBER FINAL FIX */
+let orderIdMatch = invText.match(/Order\s*(ID|Number)[^\d]*([0-9-]{10,})/i)
+let orderId = orderIdMatch ? orderIdMatch[2] : "NA"
 
 /* SKU */
 let skuMatches=[...invText.matchAll(/\(\s*([A-Z0-9]+(?:-[A-Z0-9]+)+)\s*\)/g)]
@@ -255,6 +257,7 @@ setTimeout(()=>win.print(),500)
 window.onfocus=()=>hideLoader()
 }
 
+/* FLIPKART */
 async function processFlipkart(){
 if(!pdfBuffer){alert("Upload PDF");return}
 
@@ -274,6 +277,7 @@ setTimeout(()=>win.print(),500)
 window.onfocus=()=>hideLoader()
 }
 
+/* EXCEL */
 function downloadSummary(){
 let data=[["Order","Order ID","S.No","SKU","Replacement","Qty","PCS"]]
 
@@ -288,6 +292,7 @@ XLSX.utils.book_append_sheet(wb,ws,"Summary")
 XLSX.writeFile(wb,"Amazon_summary.xlsx")
 }
 
+/* SHORTCUTS */
 document.addEventListener("keydown",e=>{
 if(e.ctrlKey&&e.shiftKey&&e.key==="A")processPDF()
 if(e.ctrlKey&&e.shiftKey&&e.key==="F")processFlipkart()
