@@ -206,9 +206,13 @@ if(!text.includes("Tax Invoice")){
 const inv=await pdf.getPage(i+1)
 const invText=(await inv.getTextContent()).items.map(x=>x.str).join(" ")
 
-/* ✅ ORDER NUMBER FINAL FIX */
+/* ORDER NUMBER */
 let orderIdMatch = invText.match(/Order\s*(ID|Number)[^\d]*([0-9-]{10,})/i)
 let orderId = orderIdMatch ? orderIdMatch[2] : "NA"
+
+/* SHIP DATE */
+let shipDateMatch = invText.match(/Ship(ping)?\s*Date[:\s]*([0-9\/-]+)/i)
+let shipDate = shipDateMatch ? shipDateMatch[2] : "NA"
 
 /* SKU */
 let skuMatches=[...invText.matchAll(/\(\s*([A-Z0-9]+(?:-[A-Z0-9]+)+)\s*\)/g)]
@@ -236,6 +240,7 @@ let pcs=pack*qty
 summary.push({
 order:orderNumber,
 orderId:orderId,
+shipDate:shipDate,
 sno:serial++,
 sku:sku,
 replacement:rep.join(", "),
@@ -279,10 +284,10 @@ window.onfocus=()=>hideLoader()
 
 /* EXCEL */
 function downloadSummary(){
-let data=[["Order","Order ID","S.No","SKU","Replacement","Qty","PCS"]]
+let data=[["Order","Order ID","Ship Date","S.No","SKU","Replacement","Qty","PCS"]]
 
 summary.forEach(r=>{
-data.push([r.order,r.orderId,r.sno,r.sku,r.replacement,r.qty,r.pcs])
+data.push([r.order,r.orderId,r.shipDate,r.sno,r.sku,r.replacement,r.qty,r.pcs])
 })
 
 let ws=XLSX.utils.aoa_to_sheet(data)
