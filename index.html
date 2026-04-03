@@ -132,7 +132,6 @@ const pdf=await pdfjsLib.getDocument({data:pdfBuffer}).promise
 const newPdf=await PDFLib.PDFDocument.create()
 const original=await PDFLib.PDFDocument.load(pdfBuffer)
 
-/* 🔥 FIXED LOOP (ODD = LABEL, EVEN = INVOICE) */
 for(let i=1;i<=pdf.numPages;i+=2){
 
 /* ===== LABEL PAGE ===== */
@@ -140,27 +139,72 @@ const labelPage=await pdf.getPage(i)
 const content=await labelPage.getTextContent()
 const items=content.items
 
-/* SHIP DATE (RIGHT SIDE) */
+/* 🔥 SHIP DATE (BOTTOM MOST DATE) */
 let shipDate="Not found"
+let maxY=0
 
 for(let a=0;a<items.length;a++){
 
 let txt=items[a].str.trim()
-let x=items[a].transform[4]
+let y=items[a].transform[5]
 
-if(x>300 && /\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/.test(txt)){
+if(/\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/.test(txt)){
+
+if(y > maxY){
+maxY=y
 shipDate=txt
-break
 }
+
+}
+
 }
 
 /* ===== INVOICE PAGE ===== */
 const invPage=await pdf.getPage(i+1)
-const invText=(await invPage.getTextContent()).items.map(x=>x.str).join(" ")
+const invItems=(await invPage.getTextContent()).items
+const invText=invItems.map(x=>x.str).join(" ")
 
 /* ORDER ID */
 let orderMatch=invText.match(/Order\s*(ID|Number)[^\d]*([0-9-]{10,})/i)
 let orderId=orderMatch?orderMatch[2]:"NA"
+
+/* 🔥 ORDER DATE (INVOICE) */
+let orderDate="Not found"
+
+for(let j=0;j<invItems.length;j++){
+
+let t=invItems[j].str.toLowerCase()
+
+if(t.includes("order") && t.includes("date")){
+
+let y=invItems[j].transform[5]
+
+for(let k=0;k<invItems.length;k++){
+
+if(Math.abs(invItems[k].transform[5]-y)<5){
+
+let val=invItems[k].str.trim()
+
+if(/\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/.test(val)){
+orderDate=val
+break
+}
+
+}
+
+}
+
+}
+
+}
+
+/* fallback */
+if(orderDate==="Not found"){
+
+let m=invText.match(/\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/)
+if(m) orderDate=m[0]
+
+}
 
 /* SKU */
 let skuMatches=[...invText.matchAll(/\(\s*([A-Z0-9]+(?:-[A-Z0-9]+)+)\s*\)/g)]
@@ -189,6 +233,7 @@ let pcs=pack*qty
 summary.push({
 order:orderNo,
 orderId,
+orderDate,
 shipDate,
 sno:serial++,
 sku,
@@ -216,10 +261,20 @@ window.onfocus=hide
 /* EXCEL */
 function downloadExcel(){
 
-let data=[["Order","Order ID","Ship Date","S.No","SKU","Replacement","Qty","PCS"]]
+let data=[["Order","Order ID","Order Date","Ship Date","S.No","SKU","Replacement","Qty","PCS"]]
 
 summary.forEach(r=>{
-data.push([r.order,r.orderId,r.shipDate,r.sno,r.sku,r.replacement,r.qty,r.pcs])
+data.push([
+r.order,
+r.orderId,
+r.orderDate,
+r.shipDate,
+r.sno,
+r.sku,
+r.replacement,
+r.qty,
+r.pcs
+])
 })
 
 let ws=XLSX.utils.aoa_to_sheet(data)
