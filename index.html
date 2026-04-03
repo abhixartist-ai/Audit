@@ -23,12 +23,10 @@ padding:30px;
 margin:0;
 min-height:100vh;
 background:linear-gradient(135deg,#1e1e2f,#12121c);
-background-repeat:no-repeat;
 background-attachment:fixed;
 color:#e4e6eb;
 }
 
-/* LOGIN */
 #loginBox{
 position:fixed;
 top:0;left:0;
@@ -53,7 +51,6 @@ color:#fff;
 
 .loginBtn{width:200px;}
 
-/* UPLOAD */
 #dropZone{
 border:2px dashed #667eea;
 padding:40px;
@@ -69,7 +66,6 @@ background:rgba(0,255,150,0.15);
 border-color:#00ff99;
 }
 
-/* BUTTON */
 button{
 padding:12px 22px;
 background:linear-gradient(135deg,#667eea,#764ba2);
@@ -84,7 +80,6 @@ cursor:pointer;
 button{width:100%;}
 }
 
-/* LOADER */
 #loader{
 display:none;
 position:fixed;
@@ -139,7 +134,6 @@ animation:spin 1s linear infinite;
 
 let pdfBuffer,skuMap={},summary=[],serial=1,orderNumber=1
 
-/* PASSWORD */
 function checkPassword(){
 if(passInput.value==="1234"){
 loginBox.style.display="none"
@@ -148,11 +142,9 @@ loginBox.style.display="none"
 
 passInput.onkeydown=e=>{if(e.key==="Enter")checkPassword()}
 
-/* LOADER */
 function showLoader(){loader.style.display="flex"}
 function hideLoader(){loader.style.display="none"}
 
-/* UPLOAD */
 dropZone.onclick=()=>pdfUpload.click()
 
 pdfUpload.onchange=handleFile
@@ -181,7 +173,6 @@ hideLoader()
 r.readAsArrayBuffer(file)
 }
 
-/* CSV */
 fetch("sku_map.csv")
 .then(r=>r.text())
 .then(t=>{
@@ -194,7 +185,6 @@ skuMap[c[0]].push(c[1])
 })
 })
 
-/* AMAZON */
 async function processPDF(){
 if(!pdfBuffer){alert("Upload PDF");return}
 
@@ -214,7 +204,11 @@ if(!text.includes("Tax Invoice")){
 const inv=await pdf.getPage(i+1)
 const invText=(await inv.getTextContent()).items.map(x=>x.str).join(" ")
 
-/* SKU FIX */
+/* ORDER ID */
+let orderIdMatch = invText.match(/Order\s*ID[:\s]*([A-Z0-9-]+)/i)
+let orderId = orderIdMatch ? orderIdMatch[1] : "NA"
+
+/* SKU */
 let skuMatches=[...invText.matchAll(/\(\s*([A-Z0-9]+(?:-[A-Z0-9]+)+)\s*\)/g)]
 let qtyMatches=[...invText.matchAll(/₹[\d\.]+\s+(\d+)\s+₹/g)]
 
@@ -237,9 +231,9 @@ pack+=m?parseInt(m[1]):1
 
 let pcs=pack*qty
 
-/* SUMMARY FIX */
 summary.push({
 order:orderNumber,
+orderId:orderId,
 sno:serial++,
 sku:sku,
 replacement:rep.join(", "),
@@ -261,7 +255,6 @@ setTimeout(()=>win.print(),500)
 window.onfocus=()=>hideLoader()
 }
 
-/* FLIPKART */
 async function processFlipkart(){
 if(!pdfBuffer){alert("Upload PDF");return}
 
@@ -281,12 +274,11 @@ setTimeout(()=>win.print(),500)
 window.onfocus=()=>hideLoader()
 }
 
-/* EXCEL */
 function downloadSummary(){
-let data=[["Order","S.No","SKU","Replacement","Qty","PCS"]]
+let data=[["Order","Order ID","S.No","SKU","Replacement","Qty","PCS"]]
 
 summary.forEach(r=>{
-data.push([r.order,r.sno,r.sku,r.replacement,r.qty,r.pcs])
+data.push([r.order,r.orderId,r.sno,r.sku,r.replacement,r.qty,r.pcs])
 })
 
 let ws=XLSX.utils.aoa_to_sheet(data)
@@ -296,7 +288,6 @@ XLSX.utils.book_append_sheet(wb,ws,"Summary")
 XLSX.writeFile(wb,"Amazon_summary.xlsx")
 }
 
-/* SHORTCUT */
 document.addEventListener("keydown",e=>{
 if(e.ctrlKey&&e.shiftKey&&e.key==="A")processPDF()
 if(e.ctrlKey&&e.shiftKey&&e.key==="F")processFlipkart()
