@@ -1,149 +1,311 @@
-<!DOCTYPE html><html lang="en">
+<!DOCTYPE html>
+<html>
 <head>
-<meta charset="UTF-8">
+
+<title>Amazon / Flipkart Label Tool</title>
+<link rel="icon" href="favicon.png">
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Amazon Label Tool Pro</title><script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script><style>
-body {margin:0;font-family:Arial;background:#0f172a;color:white}
-.card {background:#1e293b;margin:15px;padding:20px;border-radius:15px}
-#dropZone {border:2px dashed #555;padding:40px;text-align:center;border-radius:10px;transition:0.3s}
-#dropZone.drag {background:#334155}
-#dropZone.done {background:#065f46}
-button {margin:10px;padding:12px 20px;border:none;border-radius:10px;background:#6366f1;color:white;cursor:pointer}
-#loader {display:none;text-align:center}
-.menu {position:fixed;top:0;left:0;width:250px;height:100%;background:#020617;transform:translateX(-100%);transition:0.3s;padding:20px}
-.menu.active {transform:translateX(0)}
-.hamburger {position:fixed;top:10px;left:10px;font-size:24px;cursor:pointer}
-</style></head>
-<body><div class="hamburger" onclick="toggleMenu()">☰</div>
-<div class="menu" id="menu"><h3>Menu</h3></div><div class="card" id="greeting"></div><div class="card">
-<h3>Upload PDF</h3>
-<div id="dropZone">Drag & Drop PDF</div>
-<input type="file" id="pdfInput" hidden accept="application/pdf">
-</div><div class="card">
-<button onclick="labelOnly()">1. Label Generate</button>
-<button onclick="cropPDF()">2. Crop PDF</button>
-<button onclick="exportExcel()">3. Export Excel</button>
-</div><div id="loader">Processing...</div><script>
-let pdfFile, skuMap = {};
 
-// 🔥 AUTO LOAD CSV FROM GITHUB
-fetch("sku_map.csv")
-.then(res=>res.text())
-.then(csv=>{
-let data = Papa.parse(csv, {header:true}).data;
-data.forEach(r=>{
-if(r.SKU) skuMap[r.SKU.trim()] = r.REPLACEMENT;
-});
-console.log("SKU MAP LOADED", skuMap);
-});
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+</script>
 
-function toggleMenu(){document.getElementById("menu").classList.toggle("active")}
+<script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-function greeting(){
-let h=new Date().getHours(),msg="Good Evening";
-if(h<12)msg="Good Morning";else if(h<18)msg="Good Afternoon";
-let now=new Date();
-document.getElementById("greeting").innerHTML=`<h2>${msg}</h2><p>${now.toDateString()}</p><p>${now.toLocaleTimeString()}</p>`
+<style>
+body{
+font-family:Arial;
+padding:30px;
+margin:0;
+min-height:100vh;
+background:linear-gradient(135deg,#1e1e2f,#12121c);
+background-repeat:no-repeat;
+background-attachment:fixed;
+color:#e4e6eb;
 }
-greeting();
 
-let dz=document.getElementById("dropZone"),pdfInput=document.getElementById("pdfInput");
-dz.onclick=()=>pdfInput.click();
-pdfInput.onchange=e=>loadPDF(e.target.files[0]);
+/* LOGIN */
+#loginBox{
+position:fixed;
+top:0;left:0;
+width:100%;height:100%;
+background:linear-gradient(135deg,#1e1e2f,#12121c);
+display:flex;
+justify-content:center;
+align-items:center;
+flex-direction:column;
+z-index:9999;
+}
 
-dz.ondragover=e=>{e.preventDefault();dz.classList.add("drag")}
-dz.ondragleave=()=>dz.classList.remove("drag")
-dz.ondrop=e=>{e.preventDefault();dz.classList.remove("drag");loadPDF(e.dataTransfer.files[0])}
+#passInput{
+width:300px;height:45px;
+font-size:18px;
+padding:8px 12px;
+border-radius:10px;
+border:1px solid #444;
+background:#1f1f2e;
+color:#fff;
+}
 
-function loadPDF(f){pdfFile=f;dz.classList.add("done")}
+.loginBtn{
+width:200px;
+}
 
-async function readPDF(){
-let reader=new FileReader();
-reader.readAsArrayBuffer(pdfFile);
-return new Promise(resolve=>{
-reader.onload=async function(){
-let pdf=await pdfjsLib.getDocument({data:reader.result}).promise;
-let rows=[];
+/* UPLOAD BOX */
+#dropZone{
+border:2px dashed #667eea;
+padding:40px;
+text-align:center;
+background:rgba(255,255,255,0.05);
+margin-top:20px;
+transition:0.3s;
+border-radius:12px;
+cursor:pointer;
+}
+
+#dropZone:hover{
+background:rgba(102,126,234,0.15);
+}
+
+#dropZone.active{
+background:rgba(0,255,150,0.15);
+border-color:#00ff99;
+}
+
+/* BUTTON */
+button{
+padding:12px 22px;
+background:linear-gradient(135deg,#667eea,#764ba2);
+color:white;
+border:none;
+cursor:pointer;
+margin-top:12px;
+border-radius:10px;
+font-weight:bold;
+}
+
+button:hover{
+box-shadow:0 10px 25px rgba(102,126,234,0.4);
+}
+
+/* LOADER */
+#loader{
+display:none;
+position:fixed;
+top:0;left:0;
+width:100%;height:100%;
+background:rgba(0,0,0,0.6);
+justify-content:center;
+align-items:center;
+z-index:9999;
+}
+
+#loader div{
+border:6px solid #333;
+border-top:6px solid #667eea;
+border-radius:50%;
+width:60px;height:60px;
+animation:spin 1s linear infinite;
+}
+
+@keyframes spin{
+0%{transform:rotate(0)}
+100%{transform:rotate(360deg)}
+}
+
+@media(max-width:600px){
+body{padding:15px;}
+#dropZone{padding:25px;}
+button{width:100%;}
+}
+</style>
+
+</head>
+
+<body>
+
+<!-- LOGIN -->
+<div id="loginBox">
+<h2>Enter Password</h2>
+<input type="password" id="passInput">
+<button class="loginBtn" onclick="checkPassword()">Enter</button>
+<p id="errorMsg" style="color:red;"></p>
+</div>
+
+<h2>Amazon / Flipkart Label Tool</h2>
+
+<!-- UPLOAD -->
+<div id="dropZone">
+<input type="file" id="pdfUpload" accept="application/pdf" hidden>
+<span id="dropText">Click or Drag & Drop PDF</span>
+</div>
+
+<br>
+
+<button onclick="processPDF()">Print Amazon Labels</button>
+<button onclick="processFlipkart()">Print Flipkart Labels</button>
+<button onclick="downloadSummary()">Download Summary</button>
+
+<p id="status"></p>
+
+<div id="loader"><div></div></div>
+
+<script>
+
+let pdfBuffer,skuMap={},summary=[],serial=1,orderNumber=1
+
+/* PASSWORD */
+function checkPassword(){
+if(document.getElementById("passInput").value==="1234"){
+document.getElementById("loginBox").style.display="none"
+}else{
+document.getElementById("errorMsg").innerText="Wrong Password"
+}
+}
+
+/* ENTER KEY */
+document.getElementById("passInput").addEventListener("keydown",e=>{
+if(e.key==="Enter")checkPassword()
+})
+
+/* LOADER */
+function showLoader(){loader.style.display="flex"}
+function hideLoader(){loader.style.display="none"}
+
+/* UPLOAD */
+dropZone.onclick=()=>pdfUpload.click()
+
+pdfUpload.onchange=handleFile
+
+dropZone.ondragover=e=>{
+e.preventDefault()
+dropZone.style.background="rgba(102,126,234,0.15)"
+}
+
+dropZone.ondrop=e=>{
+e.preventDefault()
+handleFile({target:{files:[e.dataTransfer.files[0]]}})
+}
+
+function handleFile(e){
+let file=e.target.files[0]
+if(!file)return
+
+showLoader()
+
+let reader=new FileReader()
+reader.onload=function(){
+pdfBuffer=this.result
+status.innerText="PDF Loaded"
+dropText.innerText="✔ "+file.name
+dropZone.classList.add("active")
+hideLoader()
+}
+reader.readAsArrayBuffer(file)
+}
+
+/* CSV */
+fetch("sku_map.csv")
+.then(r=>r.text())
+.then(t=>{
+t.split("\n").slice(1).forEach(r=>{
+let c=r.split(",")
+if(c.length>=2){
+if(!skuMap[c[0]])skuMap[c[0]]=[]
+skuMap[c[0]].push(c[1])
+}
+})
+})
+
+/* AMAZON */
+async function processPDF(){
+if(!pdfBuffer){alert("Upload PDF");return}
+
+showLoader()
+
+const pdf=await pdfjsLib.getDocument({data:pdfBuffer}).promise
+const newPdf=await PDFLib.PDFDocument.create()
+const original=await PDFLib.PDFDocument.load(pdfBuffer)
 
 for(let i=1;i<=pdf.numPages;i++){
-let page=await pdf.getPage(i);
-let txt=await page.getTextContent();
-let str=txt.items.map(x=>x.str).join(" ");
+const p=await pdf.getPage(i)
+const text=(await p.getTextContent()).items.map(x=>x.str).join(" ")
 
-let orderId=(str.match(/Order\s*ID[:\s]*([A-Z0-9-]+)/i)||[])[1]||"";
-let shipDate=(str.match(/Ship\s*Date[:\s]*([0-9\/-]+)/i)||[])[1]||"";
-let orderDate=(str.match(/Order\s*Date[:\s]*([0-9\/-]+)/i)||[])[1]||"";
+if(!text.includes("Tax Invoice")){
 
-let skuMatches=[...str.matchAll(/SKU[:\s]*([A-Z0-9-]+)/gi)];
-let qtyMatches=[...str.matchAll(/Qty[:\s]*(\d+)/gi)];
+const inv=await pdf.getPage(i+1)
+const invText=(await inv.getTextContent()).items.map(x=>x.str).join(" ")
 
-for(let j=0;j<skuMatches.length;j++){
-let sku=skuMatches[j][1];
-let qty=parseInt(qtyMatches[j]?.[1]||1);
-let replacement=skuMap[sku]||"";
+/* ✅ FIXED SKU LOGIC */
+let skuMatches=[...invText.matchAll(/\(\s*([A-Z0-9]+(?:-[A-Z0-9]+)+)\s*\)/g)]
 
-let pack=1;
-let m=replacement.match(/-(\d+)/);
-if(m) pack=parseInt(m[1]);
+let qtyMatches=[...invText.matchAll(/₹[\d\.]+\s+(\d+)\s+₹/g)]
 
-rows.push({
-orderId, shipDate, orderDate, sku, replacement, qty, pcs:pack*qty
-});
+const [copy]=await newPdf.copyPages(original,[i-1])
+newPdf.addPage(copy)
+
+let page=newPdf.getPages().pop()
+
+for(let k=0;k<skuMatches.length;k++){
+let sku=skuMatches[k][1]
+let qty=qtyMatches[k]?parseInt(qtyMatches[k][1]):1
+
+let rep=skuMap[sku]||[sku]
+
+let pcs=qty
+
+let y=180-(k*14)
+
+page.drawText(rep.join(", ")+" x"+qty+" ("+pcs+")",{x:50,y:y,size:12})
 }
 }
-resolve(rows);
-}
-});
 }
 
-// 1️⃣ LABEL FUNCTION
-async function labelOnly(){
-if(!pdfFile) return alert("Upload PDF first");
-document.getElementById("loader").style.display="block";
+let win=window.open(URL.createObjectURL(new Blob([await newPdf.save()],{type:"application/pdf"})))
+setTimeout(()=>win.print(),500)
 
-let rows = await readPDF();
-
-let text="";
-rows.forEach(r=>{
-text += `${r.replacement} (${r.pcs} pcs)\n`;
-});
-
-console.log("LABEL TEXT:\n", text);
-alert("Label text console me generate ho gaya");
-
-document.getElementById("loader").style.display="none";
+window.onfocus=()=>{hideLoader()}
 }
 
-// 2️⃣ CROP FUNCTION
-function cropPDF(){
-alert("Crop feature next upgrade me add hoga (exact center crop)");
+/* FLIPKART */
+async function processFlipkart(){
+if(!pdfBuffer){alert("Upload PDF");return}
+showLoader()
+
+const pdf=await pdfjsLib.getDocument({data:pdfBuffer}).promise
+const newPdf=await PDFLib.PDFDocument.create()
+const original=await PDFLib.PDFDocument.load(pdfBuffer)
+
+for(let i=0;i<pdf.numPages;i++){
+const [p]=await newPdf.copyPages(original,[i])
+newPdf.addPage(p)
 }
 
-// 3️⃣ EXCEL EXPORT
-async function exportExcel(){
-if(!pdfFile) return alert("Upload PDF first");
-document.getElementById("loader").style.display="block";
+let win=window.open(URL.createObjectURL(new Blob([await newPdf.save()],{type:"application/pdf"})))
+setTimeout(()=>win.print(),500)
 
-let rows = await readPDF();
-
-let formatted = rows.map(r=>({
-"Order ID":r.orderId,
-"Ship Date":r.shipDate,
-"Order Date":r.orderDate,
-"SKU":r.sku,
-"Replacement":r.replacement,
-"Qty":r.qty,
-"Pack*Qty":r.pcs
-}));
-
-let ws=XLSX.utils.json_to_sheet(formatted);
-let wb=XLSX.utils.book_new();
-XLSX.utils.book_append_sheet(wb,ws,"Orders");
-XLSX.writeFile(wb,"Amazon_Data.xlsx");
-
-
-document.getElementById("loader").style.display="none";
+window.onfocus=()=>{hideLoader()}
 }
 
-</script></body>
+/* EXCEL */
+function downloadSummary(){
+let ws=XLSX.utils.json_to_sheet(summary)
+let wb=XLSX.utils.book_new()
+XLSX.utils.book_append_sheet(wb,ws,"Summary")
+XLSX.writeFile(wb,"summary.xlsx")
+}
+
+/* SHORTCUT */
+document.addEventListener("keydown",e=>{
+if(e.ctrlKey&&e.shiftKey&&e.key==="A"){processPDF()}
+if(e.ctrlKey&&e.shiftKey&&e.key==="F"){processFlipkart()}
+})
+
+</script>
+
+</body>
 </html>
