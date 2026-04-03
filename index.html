@@ -2,8 +2,7 @@
 <html>
 <head>
 
-<title>Amazon / Flipkart Label Tool</title>
-<link rel="icon" href="favicon.png">
+<title>Amazon Label Tool PRO (OCR Enabled)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
@@ -14,19 +13,20 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
 
 <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@2/dist/tesseract.min.js"></script>
 
 <style>
 body{
 margin:0;
 font-family:Arial;
-background:linear-gradient(135deg,#0f0f1a,#1a1a2e);
+background:linear-gradient(135deg,#667eea,#764ba2);
 color:#fff;
 text-align:center;
 padding:20px;
 }
 
 #dropZone{
-border:2px dashed #667eea;
+border:2px dashed #fff;
 padding:40px;
 border-radius:12px;
 cursor:pointer;
@@ -38,7 +38,7 @@ margin-top:10px;
 padding:12px;
 border:none;
 border-radius:10px;
-background:linear-gradient(135deg,#667eea,#764ba2);
+background:#000;
 color:#fff;
 cursor:pointer;
 }
@@ -55,9 +55,9 @@ z-index:999;
 }
 
 #loader div{
-width:50px;height:50px;
-border:5px solid #333;
-border-top:5px solid #667eea;
+width:60px;height:60px;
+border:6px solid #333;
+border-top:6px solid #fff;
 border-radius:50%;
 animation:spin 1s linear infinite;
 }
@@ -71,15 +71,15 @@ animation:spin 1s linear infinite;
 
 <body>
 
-<h2>Amazon / Flipkart Label Tool</h2>
+<h2>Amazon Label Tool PRO (OCR)</h2>
 
 <div id="dropZone" onclick="fileInput.click()">
 <input type="file" id="fileInput" hidden>
 Click or Drag PDF
 </div>
 
-<button onclick="processPDF()">Print Amazon Label</button>
-<button onclick="downloadExcel()">Download Summary</button>
+<button onclick="processPDF()">Print Label PDF</button>
+<button onclick="downloadExcel()">Download Excel</button>
 
 <div id="loader"><div></div></div>
 
@@ -120,6 +120,25 @@ skuMap[c[0]].push(c[1])
 })
 })
 
+/* OCR FUNCTION */
+async function getShipDateFromLabel(page){
+
+const viewport = page.getViewport({scale:2})
+const canvas = document.createElement("canvas")
+const ctx = canvas.getContext("2d")
+
+canvas.width = viewport.width
+canvas.height = viewport.height
+
+await page.render({canvasContext:ctx, viewport}).promise
+
+const { data:{ text } } = await Tesseract.recognize(canvas,"eng")
+
+let match = text.match(/\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/)
+
+return match ? match[0] : "Not found"
+}
+
 async function processPDF(){
 
 if(!pdfBuffer){alert("Upload PDF");return}
@@ -134,30 +153,9 @@ const original=await PDFLib.PDFDocument.load(pdfBuffer)
 
 for(let i=1;i<=pdf.numPages;i+=2){
 
-/* ===== LABEL PAGE ===== */
+/* ===== LABEL PAGE (OCR) ===== */
 const labelPage=await pdf.getPage(i)
-const content=await labelPage.getTextContent()
-const items=content.items
-
-/* 🔥 SHIP DATE (BOTTOM MOST DATE) */
-let shipDate="Not found"
-let maxY=0
-
-for(let a=0;a<items.length;a++){
-
-let txt=items[a].str.trim()
-let y=items[a].transform[5]
-
-if(/\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/.test(txt)){
-
-if(y > maxY){
-maxY=y
-shipDate=txt
-}
-
-}
-
-}
+let shipDate=await getShipDateFromLabel(labelPage)
 
 /* ===== INVOICE PAGE ===== */
 const invPage=await pdf.getPage(i+1)
@@ -168,46 +166,13 @@ const invText=invItems.map(x=>x.str).join(" ")
 let orderMatch=invText.match(/Order\s*(ID|Number)[^\d]*([0-9-]{10,})/i)
 let orderId=orderMatch?orderMatch[2]:"NA"
 
-/* 🔥 ORDER DATE (INVOICE) */
+/* ORDER DATE */
 let orderDate="Not found"
-
-for(let j=0;j<invItems.length;j++){
-
-let t=invItems[j].str.toLowerCase()
-
-if(t.includes("order") && t.includes("date")){
-
-let y=invItems[j].transform[5]
-
-for(let k=0;k<invItems.length;k++){
-
-if(Math.abs(invItems[k].transform[5]-y)<5){
-
-let val=invItems[k].str.trim()
-
-if(/\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/.test(val)){
-orderDate=val
-break
-}
-
-}
-
-}
-
-}
-
-}
-
-/* fallback */
-if(orderDate==="Not found"){
-
 let m=invText.match(/\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/)
 if(m) orderDate=m[0]
 
-}
-
 /* SKU */
-let skuMatches=[...invText.matchAll(/\(\s*([A-Z0-9]+(?:-[A-Z0-9]+)+)\s*\)/g)]
+let skuMatches=[...invText.matchAll(/\(\s*([A-Z0-9-]+)\s*\)/g)]
 let qtyMatches=[...invText.matchAll(/₹[\d\.]+\s+(\d+)\s+₹/g)]
 
 /* ADD LABEL PAGE */
@@ -224,8 +189,8 @@ let rep=skuMap[sku]||[sku]
 
 let pack=0
 rep.forEach(r=>{
-let m=r.match(/(\d+)$/)
-pack+=m?parseInt(m[1]):1
+let mm=r.match(/(\d+)$/)
+pack+=mm?parseInt(mm[1]):1
 })
 
 let pcs=pack*qty
