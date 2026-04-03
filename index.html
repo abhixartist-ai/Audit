@@ -17,30 +17,44 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
 
 <style>
 body{
-font-family:Arial;
 margin:0;
-padding:20px;
-background:linear-gradient(135deg,#1e1e2f,#12121c);
+font-family:Arial;
+background:linear-gradient(135deg,#0f0f1a,#1a1a2e);
 color:#fff;
+text-align:center;
+padding:20px;
+}
+
+h2{
+margin-bottom:20px;
 }
 
 #dropZone{
 border:2px dashed #667eea;
 padding:40px;
-text-align:center;
-border-radius:10px;
+border-radius:12px;
 cursor:pointer;
+transition:.3s;
+}
+
+#dropZone:hover{
+background:rgba(255,255,255,0.05);
 }
 
 button{
+width:100%;
 margin-top:10px;
 padding:12px;
 border:none;
-border-radius:8px;
-background:#667eea;
+border-radius:10px;
+background:linear-gradient(135deg,#667eea,#764ba2);
 color:#fff;
+font-size:14px;
 cursor:pointer;
-width:100%;
+}
+
+button:hover{
+opacity:.9;
 }
 
 #loader{
@@ -51,6 +65,7 @@ width:100%;height:100%;
 background:rgba(0,0,0,0.7);
 justify-content:center;
 align-items:center;
+z-index:999;
 }
 
 #loader div{
@@ -72,32 +87,58 @@ animation:spin 1s linear infinite;
 
 <h2>Amazon / Flipkart Label Tool</h2>
 
-<div id="dropZone" onclick="pdfUpload.click()">
-<input type="file" id="pdfUpload" hidden>
-Click or Drag PDF
+<div id="dropZone" onclick="fileInput.click()">
+<input type="file" id="fileInput" hidden>
+Click or Drag PDF Here
 </div>
 
 <button onclick="processPDF()">Print Amazon Label</button>
-<button onclick="downloadSummary()">Download Excel</button>
+<button onclick="downloadExcel()">Download Summary</button>
 
 <div id="loader"><div></div></div>
 
 <script>
 
-let pdfBuffer, summary=[], skuMap={}, serial=1, orderNo=1
+let pdfBuffer=null
+let summary=[]
+let skuMap={}
+let serial=1, orderNo=1
 
-pdfUpload.onchange=e=>{
+/* Upload */
+fileInput.onchange=e=>{
 let file=e.target.files[0]
-let r=new FileReader()
-r.onload=()=>pdfBuffer=r.result
-r.readAsArrayBuffer(file)
+let reader=new FileReader()
+reader.onload=()=>pdfBuffer=reader.result
+reader.readAsArrayBuffer(file)
 }
 
+/* Drag Drop */
+dropZone.ondragover=e=>{
+e.preventDefault()
+dropZone.style.background="rgba(255,255,255,0.1)"
+}
+
+dropZone.ondragleave=e=>{
+dropZone.style.background="transparent"
+}
+
+dropZone.ondrop=e=>{
+e.preventDefault()
+dropZone.style.background="rgba(255,255,255,0.1)"
+let file=e.dataTransfer.files[0]
+let reader=new FileReader()
+reader.onload=()=>pdfBuffer=reader.result
+reader.readAsArrayBuffer(file)
+}
+
+/* Loader */
 function show(){loader.style.display="flex"}
 function hide(){loader.style.display="none"}
 
 /* SKU MAP */
-fetch("sku_map.csv").then(r=>r.text()).then(t=>{
+fetch("sku_map.csv")
+.then(r=>r.text())
+.then(t=>{
 t.split("\n").slice(1).forEach(r=>{
 let c=r.split(",")
 if(c.length>=2){
@@ -107,34 +148,35 @@ skuMap[c[0]].push(c[1])
 })
 })
 
+/* MAIN */
 async function processPDF(){
 
-if(!pdfBuffer){alert("Upload PDF");return}
+if(!pdfBuffer){alert("Upload PDF first");return}
 
 show()
 
-summary=[];serial=1;orderNo=1
+summary=[]
+serial=1
+orderNo=1
 
 const pdf=await pdfjsLib.getDocument({data:pdfBuffer}).promise
 const newPdf=await PDFLib.PDFDocument.create()
 const original=await PDFLib.PDFDocument.load(pdfBuffer)
 
-/* LOOP (Label + Invoice pair) */
 for(let i=1;i<=pdf.numPages;i+=2){
 
-/* ===== LABEL PAGE ===== */
-const labelPage=await pdf.getPage(i)
-const content=await labelPage.getTextContent()
+/* ===== LABEL ===== */
+const page=await pdf.getPage(i)
+const content=await page.getTextContent()
 const items=content.items
 
-/* 💯 FINAL SHIP DATE LOGIC */
+/* 🔥 SHIP DATE ONLY "SHIP" */
 let shipDate=""
-let errorMsg=""
 let shipY=null
 
 for(let a=0;a<items.length;a++){
 let t=items[a].str.toLowerCase()
-if(t.includes("ship") || t.includes("date")){
+if(t.includes("ship")){
 shipY=items[a].transform[5]
 break
 }
@@ -148,44 +190,47 @@ let y=items[b].transform[5]
 let val=items[b].str.trim()
 
 if(Math.abs(y-shipY)<5){
-
-if(!val.toLowerCase().includes("ship") && !val.toLowerCase().includes("date")){
+if(!val.toLowerCase().includes("ship")){
 shipDate=val
 break
 }
+}
 
+}
+}
+
+/* fallback */
+if(shipDate===""){
+for(let c=0;c<items.length;c++){
+let v=items[c].str.trim()
+if(/\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/.test(v)){
+shipDate=v
+break
+}
 }
 }
 
 if(shipDate===""){
-errorMsg="Ship Date line found but value missing"
+shipDate="Ship Date not found"
 }
 
-}else{
-errorMsg="Ship Date text not found"
-}
+/* ===== INVOICE ===== */
+const inv=await pdf.getPage(i+1)
+const invText=(await inv.getTextContent()).items.map(x=>x.str).join(" ")
 
-if(shipDate===""){
-shipDate=errorMsg
-}
-
-/* ===== INVOICE PAGE ===== */
-const invPage=await pdf.getPage(i+1)
-const invText=(await invPage.getTextContent()).items.map(x=>x.str).join(" ")
-
-/* ORDER ID */
-let orderIdMatch=invText.match(/Order\s*(ID|Number)[^\d]*([0-9-]{10,})/i)
-let orderId=orderIdMatch?orderIdMatch[2]:"NA"
+/* Order ID */
+let orderMatch=invText.match(/Order\s*(ID|Number)[^\d]*([0-9-]{10,})/i)
+let orderId=orderMatch?orderMatch[2]:"NA"
 
 /* SKU */
 let skuMatches=[...invText.matchAll(/\(\s*([A-Z0-9]+(?:-[A-Z0-9]+)+)\s*\)/g)]
 let qtyMatches=[...invText.matchAll(/₹[\d\.]+\s+(\d+)\s+₹/g)]
 
-/* ADD LABEL PAGE */
-const [copy]=await newPdf.copyPages(original,[i-1])
-newPdf.addPage(copy)
+/* Add label page */
+const [copied]=await newPdf.copyPages(original,[i-1])
+newPdf.addPage(copied)
 
-let page=newPdf.getPages().pop()
+let drawPage=newPdf.getPages().pop()
 
 for(let k=0;k<skuMatches.length;k++){
 
@@ -212,7 +257,7 @@ qty,
 pcs
 })
 
-page.drawText(rep.join(", ")+" x"+qty+" ("+pcs+")",
+drawPage.drawText(rep.join(", ")+" x"+qty+" ("+pcs+")",
 {x:50,y:180-(k*14),size:12})
 }
 
@@ -220,13 +265,20 @@ orderNo++
 }
 
 /* PRINT */
-let win=window.open(URL.createObjectURL(new Blob([await newPdf.save()],{type:"application/pdf"})))
+let blob=new Blob([await newPdf.save()],{type:"application/pdf"})
+let url=URL.createObjectURL(blob)
+
+let win=window.open(url)
 setTimeout(()=>win.print(),500)
-window.onfocus=hide
+
+window.onfocus=()=>{
+hide()
+}
 }
 
 /* EXCEL */
-function downloadSummary(){
+function downloadExcel(){
+
 let data=[["Order","Order ID","Ship Date","S.No","SKU","Replacement","Qty","PCS"]]
 
 summary.forEach(r=>{
@@ -237,7 +289,10 @@ let ws=XLSX.utils.aoa_to_sheet(data)
 let wb=XLSX.utils.book_new()
 XLSX.utils.book_append_sheet(wb,ws,"Summary")
 
-XLSX.writeFile(wb,"Amazon_summary.xlsx")
+let d=new Date()
+let name=`Amazon_summary_${d.getDate()}-${d.getMonth()+1}-${d.getFullYear()}.xlsx`
+
+XLSX.writeFile(wb,name)
 }
 
 </script>
