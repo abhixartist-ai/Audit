@@ -76,10 +76,6 @@ border-radius:10px;
 cursor:pointer;
 }
 
-@media(max-width:600px){
-button{width:100%;}
-}
-
 #loader{
 display:none;
 position:fixed;
@@ -200,21 +196,34 @@ const original=await PDFLib.PDFDocument.load(pdfBuffer)
 for(let i=1;i<=pdf.numPages;i++){
 
 const p=await pdf.getPage(i)
-
-/* 🔥 REAL SHIP DATE FIX */
-let shipDate="NA"
 const content = await p.getTextContent()
 const items = content.items
 
-for(let x=0;x<items.length;x++){
+/* 🔥 FINAL SHIP DATE (X + Y BASED) */
+let shipDate="NA"
+let shipY=null
+let shipX=null
 
-let txt = items[x].str.toLowerCase()
+for(let i2=0;i2<items.length;i2++){
+let txt = items[i2].str.toLowerCase()
 
-if(txt.includes("ship") || txt.includes("date")){
+if(txt.includes("ship") && txt.includes("date")){
+shipY = items[i2].transform[5]
+shipX = items[i2].transform[4]
+break
+}
+}
 
-for(let y=x;y<x+10 && y<items.length;y++){
+if(shipY !== null){
 
-let val = items[y].str
+for(let i2=0;i2<items.length;i2++){
+
+let y = items[i2].transform[5]
+let x = items[i2].transform[4]
+let val = items[i2].str
+
+// same line + right side only
+if(Math.abs(y - shipY) < 5 && x > shipX){
 
 if(/[0-9]{1,2}\/[0-9]{1,2}\/[0-9]{2,4}/.test(val)){
 shipDate = val
@@ -225,10 +234,9 @@ break
 
 }
 
-if(shipDate !== "NA") break
 }
 
-/* TEXT FOR OTHER USE */
+/* TEXT */
 const text = items.map(i=>i.str).join(" ")
 
 if(!text.includes("Tax Invoice")){
@@ -274,8 +282,8 @@ qty:qty,
 pcs:pcs
 })
 
-let y=180-(k*14)
-page.drawText(rep.join(", ")+" x"+qty+" ("+pcs+")",{x:50,y:y,size:12})
+let yPos=180-(k*14)
+page.drawText(rep.join(", ")+" x"+qty+" ("+pcs+")",{x:50,y:yPos,size:12})
 }
 
 orderNumber++
