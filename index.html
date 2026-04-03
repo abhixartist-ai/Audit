@@ -3,6 +3,8 @@
 <head>
 
 <title>Amazon / Flipkart Label Tool</title>
+<link rel="icon" href="favicon.png">
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
@@ -17,34 +19,88 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
 <style>
 body{
 font-family:Arial;
-margin:0;
 padding:30px;
+margin:0;
+min-height:100vh;
 background:linear-gradient(135deg,#1e1e2f,#12121c);
 background-attachment:fixed;
+color:#e4e6eb;
+}
+
+#loginBox{
+position:fixed;
+top:0;left:0;
+width:100%;height:100%;
+background:linear-gradient(135deg,#1e1e2f,#12121c);
+display:flex;
+justify-content:center;
+align-items:center;
+flex-direction:column;
+z-index:9999;
+}
+
+#passInput{
+width:300px;height:45px;
+font-size:18px;
+padding:8px 12px;
+border-radius:10px;
+border:1px solid #444;
+background:#1f1f2e;
 color:#fff;
 }
+
+.loginBtn{width:200px;}
 
 #dropZone{
 border:2px dashed #667eea;
 padding:40px;
 text-align:center;
-border-radius:10px;
-cursor:pointer;
 background:rgba(255,255,255,0.05);
+margin-top:20px;
+border-radius:12px;
+cursor:pointer;
+}
+
+#dropZone.active{
+background:rgba(0,255,150,0.15);
+border-color:#00ff99;
 }
 
 button{
-padding:12px 20px;
-margin-top:10px;
-border:none;
-border-radius:10px;
+padding:12px 22px;
 background:linear-gradient(135deg,#667eea,#764ba2);
-color:#fff;
+color:white;
+border:none;
+margin-top:10px;
+border-radius:10px;
 cursor:pointer;
 }
 
 @media(max-width:600px){
 button{width:100%;}
+}
+
+#loader{
+display:none;
+position:fixed;
+top:0;left:0;
+width:100%;height:100%;
+background:rgba(0,0,0,0.6);
+justify-content:center;
+align-items:center;
+z-index:9999;
+}
+
+#loader div{
+border:6px solid #333;
+border-top:6px solid #667eea;
+border-radius:50%;
+width:60px;height:60px;
+animation:spin 1s linear infinite;
+}
+
+@keyframes spin{
+100%{transform:rotate(360deg)}
 }
 </style>
 
@@ -52,57 +108,116 @@ button{width:100%;}
 
 <body>
 
-<h2>Amazon Label Tool</h2>
+<div id="loginBox">
+<h2>Enter Password</h2>
+<input type="password" id="passInput">
+<button class="loginBtn" onclick="checkPassword()">Enter</button>
+<p id="errorMsg" style="color:red;"></p>
+</div>
+
+<h2>Amazon / Flipkart Label Tool</h2>
 
 <div id="dropZone">
 <input type="file" id="pdfUpload" hidden>
-Click or Drag PDF
+<span id="dropText">Click or Drag & Drop PDF</span>
 </div>
 
-<button onclick="processPDF()">Print Labels</button>
-<button onclick="downloadSummary()">Download Excel</button>
+<button onclick="processPDF()">Print Amazon Labels</button>
+<button onclick="processFlipkart()">Print Flipkart Labels</button>
+<button onclick="downloadSummary()">Download Summary</button>
+
+<p id="status"></p>
+
+<div id="loader"><div></div></div>
 
 <script>
 
-let pdfBuffer,summary=[],serial=1,orderNumber=1
+let pdfBuffer,skuMap={},summary=[],serial=1,orderNumber=1
 
-dropZone.onclick=()=>pdfUpload.click()
-pdfUpload.onchange=e=>{
-let r=new FileReader()
-r.onload=()=>pdfBuffer=r.result
-r.readAsArrayBuffer(e.target.files[0])
+function checkPassword(){
+if(passInput.value==="1234"){
+loginBox.style.display="none"
+}else errorMsg.innerText="Wrong Password"
 }
 
-/* MAIN */
+passInput.onkeydown=e=>{if(e.key==="Enter")checkPassword()}
+
+function showLoader(){loader.style.display="flex"}
+function hideLoader(){loader.style.display="none"}
+
+dropZone.onclick=()=>pdfUpload.click()
+
+pdfUpload.onchange=handleFile
+
+dropZone.ondrop=e=>{
+e.preventDefault()
+handleFile({target:{files:[e.dataTransfer.files[0]]}})
+}
+
+dropZone.ondragover=e=>e.preventDefault()
+
+function handleFile(e){
+let file=e.target.files[0]
+if(!file)return
+
+showLoader()
+
+let r=new FileReader()
+r.onload=function(){
+pdfBuffer=this.result
+status.innerText="PDF Loaded"
+dropText.innerText="✔ "+file.name
+dropZone.classList.add("active")
+hideLoader()
+}
+r.readAsArrayBuffer(file)
+}
+
+/* SKU MAP */
+fetch("sku_map.csv")
+.then(r=>r.text())
+.then(t=>{
+t.split("\n").slice(1).forEach(r=>{
+let c=r.split(",")
+if(c.length>=2){
+if(!skuMap[c[0]])skuMap[c[0]]=[]
+skuMap[c[0]].push(c[1])
+}
+})
+})
+
+/* AMAZON */
 async function processPDF(){
+if(!pdfBuffer){alert("Upload PDF");return}
+
+showLoader()
+summary=[];serial=1;orderNumber=1
 
 const pdf=await pdfjsLib.getDocument({data:pdfBuffer}).promise
 const newPdf=await PDFLib.PDFDocument.create()
 const original=await PDFLib.PDFDocument.load(pdfBuffer)
 
-summary=[];serial=1;orderNumber=1
-
 for(let i=1;i<=pdf.numPages;i++){
 
 const p=await pdf.getPage(i)
-const content=await p.getTextContent()
-const items=content.items
 
-/* 🔥 SHIP DATE (POSITION BASED) */
+/* 🔥 REAL SHIP DATE FIX */
 let shipDate="NA"
+const content = await p.getTextContent()
+const items = content.items
 
-for(let a=0;a<items.length;a++){
+for(let x=0;x<items.length;x++){
 
-let str=items[a].str.toLowerCase()
+let txt = items[x].str.toLowerCase()
 
-if(str.includes("ship") || str.includes("date")){
+if(txt.includes("ship") || txt.includes("date")){
 
-for(let b=a;b<a+10 && b<items.length;b++){
+for(let y=x;y<x+10 && y<items.length;y++){
 
-let val=items[b].str
+let val = items[y].str
 
 if(/[0-9]{1,2}\/[0-9]{1,2}\/[0-9]{2,4}/.test(val)){
-shipDate=val
+shipDate = val
 break
 }
 
@@ -110,66 +225,101 @@ break
 
 }
 
-if(shipDate!="NA") break
+if(shipDate !== "NA") break
 }
 
-/* LABEL PAGE */
-let text=items.map(x=>x.str).join(" ")
+/* TEXT FOR OTHER USE */
+const text = items.map(i=>i.str).join(" ")
 
 if(!text.includes("Tax Invoice")){
 
-/* INVOICE PAGE */
 const inv=await pdf.getPage(i+1)
-const invItems=(await inv.getTextContent()).items
-let invText=invItems.map(x=>x.str).join(" ")
+const invText=(await inv.getTextContent()).items.map(x=>x.str).join(" ")
 
 /* ORDER ID */
-let orderMatch=invText.match(/Order\s*(ID|Number)[^\d]*([0-9-]+)/i)
-let orderId=orderMatch?orderMatch[2]:"NA"
+let orderIdMatch = invText.match(/Order\s*(ID|Number)[^\d]*([0-9-]{10,})/i)
+let orderId = orderIdMatch ? orderIdMatch[2] : "NA"
 
 /* SKU */
-let skuMatches=[...invText.matchAll(/\(\s*([A-Z0-9\-]+)\s*\)/g)]
+let skuMatches=[...invText.matchAll(/\(\s*([A-Z0-9]+(?:-[A-Z0-9]+)+)\s*\)/g)]
+let qtyMatches=[...invText.matchAll(/₹[\d\.]+\s+(\d+)\s+₹/g)]
 
 const [copy]=await newPdf.copyPages(original,[i-1])
 newPdf.addPage(copy)
 
+let page=newPdf.getPages().pop()
+
 for(let k=0;k<skuMatches.length;k++){
+
+let sku=skuMatches[k][1]
+let qty=qtyMatches[k]?parseInt(qtyMatches[k][1]):1
+let rep=skuMap[sku]||[sku]
+
+let pack=0
+rep.forEach(r=>{
+let m=r.match(/(\d+)$/)
+pack+=m?parseInt(m[1]):1
+})
+
+let pcs=pack*qty
 
 summary.push({
 order:orderNumber,
 orderId:orderId,
 shipDate:shipDate,
 sno:serial++,
-sku:skuMatches[k][1]
+sku:sku,
+replacement:rep.join(", "),
+qty:qty,
+pcs:pcs
 })
 
+let y=180-(k*14)
+page.drawText(rep.join(", ")+" x"+qty+" ("+pcs+")",{x:50,y:y,size:12})
 }
 
 orderNumber++
 }
-
 }
 
-/* PRINT */
-let blob=await newPdf.save()
-let win=window.open(URL.createObjectURL(new Blob([blob])))
+let win=window.open(URL.createObjectURL(new Blob([await newPdf.save()],{type:"application/pdf"})))
 setTimeout(()=>win.print(),500)
+window.onfocus=()=>hideLoader()
+}
+
+/* FLIPKART */
+async function processFlipkart(){
+if(!pdfBuffer){alert("Upload PDF");return}
+
+showLoader()
+
+const pdf=await pdfjsLib.getDocument({data:pdfBuffer}).promise
+const newPdf=await PDFLib.PDFDocument.create()
+const original=await PDFLib.PDFDocument.load(pdfBuffer)
+
+for(let i=0;i<pdf.numPages;i++){
+const [p]=await newPdf.copyPages(original,[i])
+newPdf.addPage(p)
+}
+
+let win=window.open(URL.createObjectURL(new Blob([await newPdf.save()],{type:"application/pdf"})))
+setTimeout(()=>win.print(),500)
+window.onfocus=()=>hideLoader()
 }
 
 /* EXCEL */
 function downloadSummary(){
-
-let data=[["Order","Order ID","Ship Date","S.No","SKU"]]
+let data=[["Order","Order ID","Ship Date","S.No","SKU","Replacement","Qty","PCS"]]
 
 summary.forEach(r=>{
-data.push([r.order,r.orderId,r.shipDate,r.sno,r.sku])
+data.push([r.order,r.orderId,r.shipDate,r.sno,r.sku,r.replacement,r.qty,r.pcs])
 })
 
 let ws=XLSX.utils.aoa_to_sheet(data)
 let wb=XLSX.utils.book_new()
 XLSX.utils.book_append_sheet(wb,ws,"Summary")
-XLSX.writeFile(wb,"summary.xlsx")
 
+XLSX.writeFile(wb,"Amazon_summary.xlsx")
 }
 
 </script>
