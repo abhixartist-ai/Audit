@@ -2,7 +2,7 @@
 <html>
 <head>
 
-<title>Amazon Label Tool PRO (OCR Enabled)</title>
+<title>Amazon Label Tool PRO (FAST)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
@@ -71,7 +71,7 @@ animation:spin 1s linear infinite;
 
 <body>
 
-<h2>Amazon Label Tool PRO (OCR)</h2>
+<h2>Amazon Label Tool PRO (FAST)</h2>
 
 <div id="dropZone" onclick="fileInput.click()">
 <input type="file" id="fileInput" hidden>
@@ -120,9 +120,21 @@ skuMap[c[0]].push(c[1])
 })
 })
 
-/* OCR FUNCTION */
-async function getShipDateFromLabel(page){
+/* 🔥 FAST HYBRID SHIP DATE */
+async function getShipDate(page){
 
+/* TRY NORMAL TEXT FIRST */
+const content = await page.getTextContent()
+const items = content.items
+
+for(let i=0;i<items.length;i++){
+let txt=items[i].str.trim()
+if(/\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/.test(txt)){
+return txt
+}
+}
+
+/* 🔥 FALLBACK OCR (CROPPED) */
 const viewport = page.getViewport({scale:2})
 const canvas = document.createElement("canvas")
 const ctx = canvas.getContext("2d")
@@ -132,7 +144,21 @@ canvas.height = viewport.height
 
 await page.render({canvasContext:ctx, viewport}).promise
 
-const { data:{ text } } = await Tesseract.recognize(canvas,"eng")
+/* CROP RIGHT-BOTTOM */
+const cropX = canvas.width*0.5
+const cropY = canvas.height*0.5
+const cropW = canvas.width*0.5
+const cropH = canvas.height*0.5
+
+const cropCanvas=document.createElement("canvas")
+const cropCtx=cropCanvas.getContext("2d")
+
+cropCanvas.width=cropW
+cropCanvas.height=cropH
+
+cropCtx.drawImage(canvas,cropX,cropY,cropW,cropH,0,0,cropW,cropH)
+
+const { data:{ text } } = await Tesseract.recognize(cropCanvas,"eng")
 
 let match = text.match(/\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/)
 
@@ -153,11 +179,11 @@ const original=await PDFLib.PDFDocument.load(pdfBuffer)
 
 for(let i=1;i<=pdf.numPages;i+=2){
 
-/* ===== LABEL PAGE (OCR) ===== */
+/* LABEL PAGE */
 const labelPage=await pdf.getPage(i)
-let shipDate=await getShipDateFromLabel(labelPage)
+let shipDate=await getShipDate(labelPage)
 
-/* ===== INVOICE PAGE ===== */
+/* INVOICE PAGE */
 const invPage=await pdf.getPage(i+1)
 const invItems=(await invPage.getTextContent()).items
 const invText=invItems.map(x=>x.str).join(" ")
