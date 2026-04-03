@@ -132,16 +132,13 @@ const pdf=await pdfjsLib.getDocument({data:pdfBuffer}).promise
 const newPdf=await PDFLib.PDFDocument.create()
 const original=await PDFLib.PDFDocument.load(pdfBuffer)
 
-for(let i=1;i<=pdf.numPages;i++){
+/* 🔥 FIXED LOOP (ODD = LABEL, EVEN = INVOICE) */
+for(let i=1;i<=pdf.numPages;i+=2){
 
-const page=await pdf.getPage(i)
-const content=await page.getTextContent()
-const text=content.items.map(x=>x.str.toLowerCase()).join(" ")
-
-/* 🔥 LABEL PAGE DETECT */
-if(text.includes("barcode")){
-
-let items=content.items
+/* ===== LABEL PAGE ===== */
+const labelPage=await pdf.getPage(i)
+const content=await labelPage.getTextContent()
+const items=content.items
 
 /* SHIP DATE (RIGHT SIDE) */
 let shipDate="Not found"
@@ -157,9 +154,9 @@ break
 }
 }
 
-/* NEXT PAGE = INVOICE */
-let invPage=await pdf.getPage(i+1)
-let invText=(await invPage.getTextContent()).items.map(x=>x.str).join(" ")
+/* ===== INVOICE PAGE ===== */
+const invPage=await pdf.getPage(i+1)
+const invText=(await invPage.getTextContent()).items.map(x=>x.str).join(" ")
 
 /* ORDER ID */
 let orderMatch=invText.match(/Order\s*(ID|Number)[^\d]*([0-9-]{10,})/i)
@@ -205,9 +202,6 @@ drawPage.drawText(rep.join(", ")+" x"+qty+" ("+pcs+")",
 }
 
 orderNo++
-i++ // skip invoice page
-}
-
 }
 
 /* PRINT */
