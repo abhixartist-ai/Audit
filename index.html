@@ -201,6 +201,10 @@ for(let i=1;i<=pdf.numPages;i++){
 const p=await pdf.getPage(i)
 const text=(await p.getTextContent()).items.map(x=>x.str).join(" ")
 
+/* ✅ SHIP DATE FROM LABEL PAGE */
+let shipDateMatch = text.match(/Ship(ping)?\s*Date[^\d]*([0-9\/-]+)/i)
+let shipDate = shipDateMatch ? shipDateMatch[2] : "NA"
+
 if(!text.includes("Tax Invoice")){
 
 const inv=await pdf.getPage(i+1)
@@ -209,10 +213,6 @@ const invText=(await inv.getTextContent()).items.map(x=>x.str).join(" ")
 /* ORDER NUMBER */
 let orderIdMatch = invText.match(/Order\s*(ID|Number)[^\d]*([0-9-]{10,})/i)
 let orderId = orderIdMatch ? orderIdMatch[2] : "NA"
-
-/* SHIP DATE */
-let shipDateMatch = invText.match(/Ship(ping)?\s*Date[:\s]*([0-9\/-]+)/i)
-let shipDate = shipDateMatch ? shipDateMatch[2] : "NA"
 
 /* SKU */
 let skuMatches=[...invText.matchAll(/\(\s*([A-Z0-9]+(?:-[A-Z0-9]+)+)\s*\)/g)]
