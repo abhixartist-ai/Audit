@@ -51,24 +51,17 @@ background:#1f1f2e;
 color:#fff;
 }
 
-.loginBtn{
-width:200px;
-}
+.loginBtn{width:200px;}
 
-/* UPLOAD BOX */
+/* UPLOAD */
 #dropZone{
 border:2px dashed #667eea;
 padding:40px;
 text-align:center;
 background:rgba(255,255,255,0.05);
 margin-top:20px;
-transition:0.3s;
 border-radius:12px;
 cursor:pointer;
-}
-
-#dropZone:hover{
-background:rgba(102,126,234,0.15);
 }
 
 #dropZone.active{
@@ -82,14 +75,13 @@ padding:12px 22px;
 background:linear-gradient(135deg,#667eea,#764ba2);
 color:white;
 border:none;
-cursor:pointer;
-margin-top:12px;
+margin-top:10px;
 border-radius:10px;
-font-weight:bold;
+cursor:pointer;
 }
 
-button:hover{
-box-shadow:0 10px 25px rgba(102,126,234,0.4);
+@media(max-width:600px){
+button{width:100%;}
 }
 
 /* LOADER */
@@ -113,14 +105,7 @@ animation:spin 1s linear infinite;
 }
 
 @keyframes spin{
-0%{transform:rotate(0)}
 100%{transform:rotate(360deg)}
-}
-
-@media(max-width:600px){
-body{padding:15px;}
-#dropZone{padding:25px;}
-button{width:100%;}
 }
 </style>
 
@@ -128,7 +113,6 @@ button{width:100%;}
 
 <body>
 
-<!-- LOGIN -->
 <div id="loginBox">
 <h2>Enter Password</h2>
 <input type="password" id="passInput">
@@ -138,13 +122,10 @@ button{width:100%;}
 
 <h2>Amazon / Flipkart Label Tool</h2>
 
-<!-- UPLOAD -->
 <div id="dropZone">
-<input type="file" id="pdfUpload" accept="application/pdf" hidden>
+<input type="file" id="pdfUpload" hidden>
 <span id="dropText">Click or Drag & Drop PDF</span>
 </div>
-
-<br>
 
 <button onclick="processPDF()">Print Amazon Labels</button>
 <button onclick="processFlipkart()">Print Flipkart Labels</button>
@@ -160,17 +141,12 @@ let pdfBuffer,skuMap={},summary=[],serial=1,orderNumber=1
 
 /* PASSWORD */
 function checkPassword(){
-if(document.getElementById("passInput").value==="1234"){
-document.getElementById("loginBox").style.display="none"
-}else{
-document.getElementById("errorMsg").innerText="Wrong Password"
-}
+if(passInput.value==="1234"){
+loginBox.style.display="none"
+}else errorMsg.innerText="Wrong Password"
 }
 
-/* ENTER KEY */
-document.getElementById("passInput").addEventListener("keydown",e=>{
-if(e.key==="Enter")checkPassword()
-})
+passInput.onkeydown=e=>{if(e.key==="Enter")checkPassword()}
 
 /* LOADER */
 function showLoader(){loader.style.display="flex"}
@@ -181,15 +157,12 @@ dropZone.onclick=()=>pdfUpload.click()
 
 pdfUpload.onchange=handleFile
 
-dropZone.ondragover=e=>{
-e.preventDefault()
-dropZone.style.background="rgba(102,126,234,0.15)"
-}
-
 dropZone.ondrop=e=>{
 e.preventDefault()
 handleFile({target:{files:[e.dataTransfer.files[0]]}})
 }
+
+dropZone.ondragover=e=>e.preventDefault()
 
 function handleFile(e){
 let file=e.target.files[0]
@@ -197,15 +170,15 @@ if(!file)return
 
 showLoader()
 
-let reader=new FileReader()
-reader.onload=function(){
+let r=new FileReader()
+r.onload=function(){
 pdfBuffer=this.result
 status.innerText="PDF Loaded"
 dropText.innerText="✔ "+file.name
 dropZone.classList.add("active")
 hideLoader()
 }
-reader.readAsArrayBuffer(file)
+r.readAsArrayBuffer(file)
 }
 
 /* CSV */
@@ -226,6 +199,7 @@ async function processPDF(){
 if(!pdfBuffer){alert("Upload PDF");return}
 
 showLoader()
+summary=[];serial=1;orderNumber=1
 
 const pdf=await pdfjsLib.getDocument({data:pdfBuffer}).promise
 const newPdf=await PDFLib.PDFDocument.create()
@@ -240,9 +214,8 @@ if(!text.includes("Tax Invoice")){
 const inv=await pdf.getPage(i+1)
 const invText=(await inv.getTextContent()).items.map(x=>x.str).join(" ")
 
-/* ✅ FIXED SKU LOGIC */
+/* SKU FIX */
 let skuMatches=[...invText.matchAll(/\(\s*([A-Z0-9]+(?:-[A-Z0-9]+)+)\s*\)/g)]
-
 let qtyMatches=[...invText.matchAll(/₹[\d\.]+\s+(\d+)\s+₹/g)]
 
 const [copy]=await newPdf.copyPages(original,[i-1])
@@ -251,29 +224,47 @@ newPdf.addPage(copy)
 let page=newPdf.getPages().pop()
 
 for(let k=0;k<skuMatches.length;k++){
+
 let sku=skuMatches[k][1]
 let qty=qtyMatches[k]?parseInt(qtyMatches[k][1]):1
-
 let rep=skuMap[sku]||[sku]
 
-let pcs=qty
+let pack=0
+rep.forEach(r=>{
+let m=r.match(/(\d+)$/)
+pack+=m?parseInt(m[1]):1
+})
+
+let pcs=pack*qty
+
+/* SUMMARY FIX */
+summary.push({
+order:orderNumber,
+sno:serial++,
+sku:sku,
+replacement:rep.join(", "),
+qty:qty,
+pcs:pcs
+})
 
 let y=180-(k*14)
 
 page.drawText(rep.join(", ")+" x"+qty+" ("+pcs+")",{x:50,y:y,size:12})
 }
+
+orderNumber++
 }
 }
 
 let win=window.open(URL.createObjectURL(new Blob([await newPdf.save()],{type:"application/pdf"})))
 setTimeout(()=>win.print(),500)
-
-window.onfocus=()=>{hideLoader()}
+window.onfocus=()=>hideLoader()
 }
 
 /* FLIPKART */
 async function processFlipkart(){
 if(!pdfBuffer){alert("Upload PDF");return}
+
 showLoader()
 
 const pdf=await pdfjsLib.getDocument({data:pdfBuffer}).promise
@@ -287,22 +278,29 @@ newPdf.addPage(p)
 
 let win=window.open(URL.createObjectURL(new Blob([await newPdf.save()],{type:"application/pdf"})))
 setTimeout(()=>win.print(),500)
-
-window.onfocus=()=>{hideLoader()}
+window.onfocus=()=>hideLoader()
 }
 
 /* EXCEL */
 function downloadSummary(){
-let ws=XLSX.utils.json_to_sheet(summary)
+let data=[["Order","S.No","SKU","Replacement","Qty","PCS"]]
+
+summary.forEach(r=>{
+data.push([r.order,r.sno,r.sku,r.replacement,r.qty,r.pcs])
+})
+
+let ws=XLSX.utils.aoa_to_sheet(data)
 let wb=XLSX.utils.book_new()
 XLSX.utils.book_append_sheet(wb,ws,"Summary")
-XLSX.writeFile(wb,"summary.xlsx")
+
+XLSX.writeFile(wb,"Amazon_summary.xlsx")
 }
 
 /* SHORTCUT */
 document.addEventListener("keydown",e=>{
-if(e.ctrlKey&&e.shiftKey&&e.key==="A"){processPDF()}
-if(e.ctrlKey&&e.shiftKey&&e.key==="F"){processFlipkart()}
+if(e.ctrlKey&&e.shiftKey&&e.key==="A")processPDF()
+if(e.ctrlKey&&e.shiftKey&&e.key==="F")processFlipkart()
+if(e.ctrlKey&&e.shiftKey&&e.key==="E")downloadSummary()
 })
 
 </script>
