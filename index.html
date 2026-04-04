@@ -1,178 +1,215 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Amazon PDF Tool</title>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<title>Amazon PDF Tool</title>
 
-    <style>
-        body { font-family: Arial; padding:20px; }
-        button { padding:10px 20px; font-size:16px; }
-        #loader { display:none; font-weight:bold; color:blue; }
-    </style>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<style>
+body{
+font-family:Arial;
+background:linear-gradient(135deg,#667eea,#764ba2);
+color:white;
+padding:20px;
+text-align:center;
+}
+
+.card{
+background:white;
+color:black;
+padding:20px;
+border-radius:15px;
+max-width:500px;
+margin:auto;
+box-shadow:0 10px 30px rgba(0,0,0,0.2);
+}
+
+button{
+padding:12px 20px;
+margin-top:10px;
+border:none;
+border-radius:10px;
+background:#667eea;
+color:white;
+font-weight:bold;
+cursor:pointer;
+}
+
+#loader{
+display:none;
+margin-top:10px;
+color:yellow;
+}
+</style>
+
 </head>
 
 <body>
 
-<h2>Upload Amazon PDF</h2>
+<h2>Amazon PDF → Excel Tool</h2>
 
-<input type="file" id="pdfFile">
-<br><br>
+<div class="card">
 
-<button onclick="processPDF()">Download Excel</button>
+<input type="file" id="pdfUpload">
+<br>
 
-<p id="loader">Processing PDF... Please wait ⏳</p>
+<button onclick="extractExcel()">Download Excel</button>
+
+<p id="loader">Processing... ⏳</p>
+
+</div>
 
 <script>
 
+let pdfBuffer;
 let skuMap = {};
 
-// ✅ Load CSV from SAME folder
-async function loadSKUMap() {
-    let res = await fetch("sku_map.csv");
-    let text = await res.text();
+// 📁 Load file
+document.getElementById("pdfUpload").addEventListener("change",function(e){
+let file = e.target.files[0];
+if(!file) return;
 
-    let lines = text.split("\n");
+let reader = new FileReader();
+reader.onload = function(){
+pdfBuffer = this.result;
+alert("PDF Loaded ✅");
+}
+reader.readAsArrayBuffer(file);
+});
 
-    lines.forEach(line => {
-        let parts = line.split(",");
-        if(parts.length >= 2){
-            let sku = parts[0].trim();
-            let replacement = parts.slice(1).join(",").trim();
-            skuMap[sku] = replacement;
-        }
-    });
+// 📦 Load SKU CSV (same folder)
+async function loadCSV(){
+let res = await fetch("sku_map.csv");
+let text = await res.text();
+
+text.split("\n").forEach(line=>{
+let parts = line.split(",");
+if(parts.length>=2){
+let sku = parts[0].trim();
+let replacements = parts.slice(1).map(x=>x.trim());
+skuMap[sku] = replacements;
+}
+});
 }
 
-// ✅ Clean number
-function cleanAmount(val){
-    return parseFloat(val.replace(/[^0-9.]/g,"")) || 0;
+// 🔥 MAIN FUNCTION
+async function extractExcel(){
+
+if(!pdfBuffer){
+alert("Upload PDF first");
+return;
 }
 
-// ✅ Main Function
-async function processPDF() {
+document.getElementById("loader").style.display = "block";
 
-    document.getElementById("loader").style.display = "block";
+await loadCSV();
 
-    await loadSKUMap();
+let data = [];
+let serial = 1;
 
-    let file = document.getElementById("pdfFile").files[0];
-    if(!file){
-        alert("Upload PDF first");
-        return;
-    }
+const pdf = await pdfjsLib.getDocument({data:pdfBuffer}).promise;
 
-    let reader = new FileReader();
+for(let i=1;i<=pdf.numPages;i++){
 
-    reader.onload = async function() {
+const page = await pdf.getPage(i);
+const text = (await page.getTextContent()).items.map(i=>i.str).join(" ");
 
-        let typedarray = new Uint8Array(this.result);
-        let pdf = await pdfjsLib.getDocument(typedarray).promise;
+// 👉 LABEL PAGE
+if(!text.includes("Tax Invoice")){
 
-        let data = [];
-        let serial = 1;
+if(i >= pdf.numPages) continue;
 
-        for (let i = 1; i <= pdf.numPages; i++) {
+// 👉 NEXT PAGE = INVOICE
+const invoice = await pdf.getPage(i+1);
+const invText = (await invoice.getTextContent()).items.map(i=>i.str).join(" ");
 
-            let page = await pdf.getPage(i);
-            let content = await page.getTextContent();
+if(!invText.includes("Tax Invoice")) continue;
 
-            let text = content.items.map(i => i.str).join(" ");
+// ✅ ORDER DETAILS
+let orderNo = (invText.match(/Order Number[: ]+([\d-]+)/)||[])[1] || "";
+let orderDate = (invText.match(/Order Date[: ]+([\d.]+)/)||[])[1] || "";
 
-            // ❌ Skip label page
-            if (!text.toLowerCase().includes("tax invoice")) continue;
+// ✅ SKU, QTY, AMOUNT
+let sku = [...invText.matchAll(/\(\s*([A-Z0-9]+(?:-[A-Z0-9]+)+)\s*\)/g)];
+let qty = [...invText.matchAll(/₹[\d\.]+\s+(\d+)\s+₹/g)];
+let amt = [...invText.matchAll(/₹\s?([\d,]+\.\d+)/g)];
 
-            // ✅ Order No
-            let orderNo = (text.match(/Order Number[:\s]*([\d-]+)/i) || [])[1] || "";
+let orderTotal = 0;
 
-            // ✅ Order Date
-            let orderDate = (text.match(/Order Date[:\s]*([\d.]+)/i) || [])[1] || "";
+for(let k=0;k<sku.length;k++){
 
-            // ✅ Extract rows by splitting using HSN (Amazon pattern)
-            let parts = text.split("HSN:");
+let s = sku[k][1];
+let q = qty[k] ? parseInt(qty[k][1]) : 1;
 
-            parts.forEach(p => {
+let amount = amt[k] ? amt[k][1] : "0";
+let cleanAmt = parseFloat(amount.replace(/,/g,"")) || 0;
 
-                // SKU detect (bracket + dash)
-                let skuMatch = p.match(/\(([A-Z0-9\-]+)\)/);
+orderTotal += cleanAmt;
 
-                if(!skuMatch) return;
+// 🔹 replacement
+let rep = skuMap[s] || [s];
 
-                let sku = skuMatch[1];
+// 🔹 PCS calculation
+let pack = 0;
+rep.forEach(r=>{
+let m = r.match(/(\d+)$/);
+pack += m ? parseInt(m[1]) : 1;
+});
 
-                // Qty detect
-                let qtyMatch = p.match(/\s(\d+)\s/);
-                let qty = qtyMatch ? parseInt(qtyMatch[1]) : 1;
+let pcs = pack * q;
 
-                // Amount detect
-                let amountMatch = p.match(/₹\s?([\d,]+\.\d+)/g);
-                if(!amountMatch) return;
+data.push([
+serial++,
+orderDate,
+orderNo,
+s,
+rep.join(", "),
+q,
+pcs,
+cleanAmt,
+"" // gross later
+]);
 
-                let totalAmount = amountMatch[amountMatch.length - 1];
+}
 
-                let replacement = skuMap[sku] || "";
+// 🔹 add gross total
+data.slice(-sku.length).forEach(r=>{
+r[8] = orderTotal;
+});
 
-                // ✅ PCS calculation
-                let pcs = 0;
-                if(replacement){
-                    let nums = replacement.match(/\d+/g);
-                    if(nums){
-                        pcs = nums.reduce((a,b)=>a+parseInt(b),0) * qty;
-                    }
-                }
+i++; // skip invoice page
+}
+}
 
-                data.push([
-                    serial++,
-                    orderDate,
-                    orderNo,
-                    sku,
-                    replacement,
-                    qty,
-                    pcs,
-                    totalAmount,
-                    "" // gross
-                ]);
+// ❌ no data
+if(data.length === 0){
+alert("No data found ❌");
+document.getElementById("loader").style.display = "none";
+return;
+}
 
-            });
+// 📊 Excel
+let ws = XLSX.utils.aoa_to_sheet([
+["S.No","Order Date","Order No","SKU","Replacement","Qty","Total PCS","Amount","Gross Total"],
+...data
+]);
 
-        }
+let wb = XLSX.utils.book_new();
+XLSX.utils.book_append_sheet(wb, ws, "Data");
 
-        // ✅ Gross Total
-        let orderMap = {};
+XLSX.writeFile(wb,"Amazon_Data.xlsx");
 
-        data.forEach(r => {
-            let amt = cleanAmount(r[7]);
-            orderMap[r[2]] = (orderMap[r[2]] || 0) + amt;
-        });
+document.getElementById("loader").style.display = "none";
 
-        data.forEach(r => {
-            r[8] = orderMap[r[2]];
-        });
-
-        // ❌ If still blank
-        if(data.length === 0){
-            alert("No data found! PDF may be scanned or format different.");
-            document.getElementById("loader").style.display = "none";
-            return;
-        }
-
-        // ✅ Excel create
-        let ws = XLSX.utils.aoa_to_sheet([
-            ["S.No","Order Date","Order No","SKU","Replacement","Qty","Total PCS","Amount","Gross Total"],
-            ...data
-        ]);
-
-        let wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Data");
-
-        XLSX.writeFile(wb, "Amazon_Data.xlsx");
-
-        document.getElementById("loader").style.display = "none";
-
-    };
-
-    reader.readAsArrayBuffer(file);
 }
 
 </script>
