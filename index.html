@@ -401,8 +401,6 @@ let qty=[...invText.matchAll(/₹[\d\.]+\s+(\d+)\s+₹/g)]
 let allAmounts = [...invText.matchAll(/₹\s*([\d,]+\.\d{2})/g)]
   .map(m => Number(m[1].replace(/,/g,"")))
 
-let grossTotal = 0
-
 let items=[]
 
 for(let k=0;k<sku.length;k++){
@@ -422,22 +420,18 @@ let pcs=pack*q
 // 🔥 CORRECT TOTAL PER SKU
 let itemTotal = allAmounts[(k*4)+3] || 0
 
-grossTotal += itemTotal
-
 items.push({name:rep.join(", "),qty:q,pcs:pcs})
 
 summary.push({
 order:k==0?orderId:"",
 date:k==0?orderDate:"",
+order:k==0?orderNumber:"",
 sno:serial++,
 sku:s,
 replacement:rep.join(", "),
 qty:q,
 pcs:pcs,
-
-// 🔥 NEW FIELDS
-itemTotal:itemTotal,
-gross:k==0?grossTotal:""
+itemTotal:itemTotal
 })
 }
 
@@ -498,7 +492,7 @@ window.onfocus=function(){hideLoader();window.onfocus=null}
 /* EXCEL */
 function downloadSummary(){
 
-let data = [["Order No","Date","S.No","SKU","Replacement","Qty","Total PCS","Item Total","Gross Total","Category","Total"]]
+let data = [["Order No","Date","Order ID","S.No","SKU","Replacement","Qty","Total PCS","Item Total","Category","Total"]]
 
 // 🔥 CATEGORY LIST
 const categories = ["SQ","BALL","CR","RH","HEART","4COM","3COM","MAT","GLOVES"]
@@ -514,13 +508,13 @@ summary.forEach(r=>{
 data.push([
 r.order,
 r.date,
+r.orderId
 r.sno,
 r.sku,
 r.replacement,
 r.qty,
 r.pcs,
-r.itemTotal,
-r.gross
+r.itemTotal
 ])
 })
 
