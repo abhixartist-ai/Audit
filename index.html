@@ -2,7 +2,7 @@
 <html>
 <head>
 
-<title>Amazon PDF Tool</title>
+<title>Amazon PDF → Excel Tool</title>
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
@@ -85,6 +85,7 @@ alert("PDF Loaded ✅");
 reader.readAsArrayBuffer(file);
 });
 
+// 📦 Load CSV
 async function loadCSV(){
 let res = await fetch("sku_map.csv");
 let text = await res.text();
@@ -99,6 +100,7 @@ skuMap[sku] = replacements;
 });
 }
 
+// 🔥 MAIN
 async function extractExcel(){
 
 if(!pdfBuffer){
@@ -113,6 +115,7 @@ await loadCSV();
 let data = [];
 let serial = 1;
 
+// 🔥 Categories
 const categories = ["SQ","BALL","CR","RH","HEART","4COM","3COM","MAT","GLOVES"];
 let categoryCount = {SQ:0,BALL:0,CR:0,RH:0,HEART:0,"4COM":0,"3COM":0,MAT:0,GLOVES:0};
 
@@ -123,18 +126,22 @@ for(let i=1;i<=pdf.numPages;i++){
 const page = await pdf.getPage(i);
 const text = (await page.getTextContent()).items.map(i=>i.str).join(" ");
 
+// 👉 LABEL PAGE
 if(!text.includes("Tax Invoice")){
 
 if(i >= pdf.numPages) continue;
 
+// 👉 NEXT PAGE = INVOICE
 const invoice = await pdf.getPage(i+1);
 const invText = (await invoice.getTextContent()).items.map(i=>i.str).join(" ");
 
 if(!invText.includes("Tax Invoice")) continue;
 
+// 🔹 ORDER INFO
 let orderNo = (invText.match(/Order Number[: ]+([\d-]+)/)||[])[1] || "";
 let orderDate = (invText.match(/Order Date[: ]+([\d.]+)/)||[])[1] || "";
 
+// 🔹 ITEMS
 let sku = [...invText.matchAll(/\(\s*([A-Z0-9]+(?:-[A-Z0-9]+)+)\s*\)/g)];
 let qty = [...invText.matchAll(/₹[\d\.]+\s+(\d+)\s+₹/g)];
 let amt = [...invText.matchAll(/₹\s?([\d,]+\.\d+)/g)];
@@ -151,18 +158,18 @@ let cleanAmt = parseFloat(amount.replace(/,/g,"")) || 0;
 
 orderTotal += cleanAmt;
 
+// 🔹 Replacement
 let rep = skuMap[s] || [s];
 
-// PCS
+// 🔹 PCS
 let pack = 0;
 rep.forEach(r=>{
 let m = r.match(/(\d+)$/);
 pack += m ? parseInt(m[1]) : 1;
 });
-
 let pcs = pack * q;
 
-// 👉 CATEGORY CALC
+// 🔥 CATEGORY LOGIC
 let found = {};
 
 rep.forEach(r=>{
@@ -194,7 +201,7 @@ categoryCount[c]+=val;
 }
 }
 
-// push row
+// 🔹 PUSH ROW
 data.push([
 serial++,
 orderDate,
@@ -204,37 +211,38 @@ rep.join(", "),
 q,
 pcs,
 cleanAmt,
-"", // gross
-"", // category
-""  // total
+orderTotal
 ]);
 
 }
 
-// gross total
-data.slice(-sku.length).forEach(r=>{
-r[8] = orderTotal;
-});
-
-i++;
+i++; // skip invoice page
 }
 }
 
-// 👉 ADD CATEGORY TO EXCEL
-categories.forEach((cat,i)=>{
-if(!data[i]) return;
-data[i][9] = cat;
-data[i][10] = categoryCount[cat];
-});
-
+// ❌ No data
 if(data.length===0){
 alert("No data found ❌");
 document.getElementById("loader").style.display = "none";
 return;
 }
 
+// 🔥 ADD CATEGORY SUMMARY AT BOTTOM
+data.push([]);
+
+data.push(["","","","","","","","","","Category","Total"]);
+
+categories.forEach(cat=>{
+data.push([
+"","","","","","","","","",
+cat,
+categoryCount[cat]
+]);
+});
+
+// 📊 Excel
 let ws = XLSX.utils.aoa_to_sheet([
-["S.No","Order Date","Order No","SKU","Replacement","Qty","Total PCS","Amount","Gross Total","Category","Category Total"],
+["S.No","Order Date","Order No","SKU","Replacement","Qty","Total PCS","Amount","Gross Total"],
 ...data
 ]);
 
