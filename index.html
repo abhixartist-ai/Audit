@@ -3,6 +3,8 @@
 <head>
 
 <title>Label Tool Pro</title>
+<link rel="icon" href="favicon.png">
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
@@ -15,105 +17,173 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <style>
+*, *::before, *::after{box-sizing:border-box;}
 body{
 font-family:Poppins, sans-serif;
-margin:0;padding:20px;
+margin:0;padding:20px;min-height:100vh;
 background:linear-gradient(135deg,#0f172a,#2f0130);
 color:white;
 }
 .container{max-width:650px;margin:auto;}
 .card{
-background:#1e2633;
-padding:25px;border-radius:20px;margin-top:20px;
+background:#1e2633;border:1px solid rgb(255,255,255,0.15);
+padding:25px;border-radius:20px;
+box-shadow:0 10px 40px rgba(0,0,0,0.5);margin-top:20px;
+}
+.login-card{
+background:#1e2633;padding:30px;border-radius:20px;
+box-shadow:0 10px 40px rgba(0,0,0,0.6);
+text-align:center;width:90%;max-width:350px;
+display:flex;flex-direction:column;align-items:center;
+}
+.login-card input{
+width:100%;padding:12px;margin-top:10px;
+border-radius:10px;border:none;background:#0f172a;color:white;
 }
 .btn{
 width:100%;padding:12px;margin-top:10px;
 border:none;border-radius:12px;
 background:linear-gradient(90deg,#6a8cff,#721978);
-color:white;font-weight:bold;cursor:pointer;
+color:white;font-weight:bold;cursor:pointer;transition:0.3s;
 }
+.btn:hover{opacity:0.85;}
+.normal-heading{font-size:22px;font-weight:600;color:#ffffff;}
+.gradient-animate{
+font-size:26px;font-weight:700;
+background:linear-gradient(90deg,#ff4ecd,#6a8cff,#00d4ff,#ff4ecd);
+background-size:300%;
+-webkit-background-clip:text;
+-webkit-text-fill-color:transparent;
+animation:move 5s linear infinite;
+}
+@keyframes move{0%{background-position:0%}100%{background-position:300%}}
+.datetime{margin-top:10px;font-size:14px;color:#cbd5e1;}
 #dropZone{
-border:2px dashed #6a8cff;
+height:80px;border:2px dashed #6a8cff;
 padding:30px;text-align:center;border-radius:15px;
-cursor:pointer;margin-top:20px;
+cursor:pointer;margin-top:20px;margin-bottom:10px;
+background:#0f172a;transition:0.3s;
 }
+#dropZone:hover{background:#2f0130;}
+#dropZone.dragover{background:rgba(0,200,83,0.15);border-color:#00c853;}
+#dropZone.uploaded{background:rgba(255,204,0,0.2);border-color:#ffcc00;}
+#status{margin:0;min-height:16px;color:#94a3b8;font-size:14px;}
 #loginBox{
 position:fixed;top:0;left:0;width:100%;height:100%;
-background:#0f172a;display:flex;justify-content:center;align-items:center;
+background:#0f172a;display:flex;justify-content:center;
+align-items:center;z-index:9999;
 }
+#loader{
+display:none;position:fixed;top:0;left:0;
+width:100%;height:100%;background:rgba(0,0,0,0.6);
+justify-content:center;align-items:center;z-index:9999;
+}
+#loader div{
+border:6px solid #333;border-top:6px solid #6a8cff;
+border-radius:50%;width:60px;height:60px;
+animation:spin 1s linear infinite;
+}
+@keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
 </style>
 </head>
 
 <body>
 
 <div id="loginBox">
-  <div class="card">
-    <h2>Enter Password</h2>
-    <input type="password" id="passInput">
+  <div class="login-card">
+    <h2 class="normal-heading">🔐 Enter Password</h2>
+    <input type="password" id="passInput" placeholder="Enter password">
     <button class="btn" onclick="checkPassword()">Enter</button>
-    <p id="errorMsg"></p>
+    <p id="errorMsg" style="color:red;"></p>
   </div>
 </div>
 
 <div class="container">
 
 <div class="card">
-  <h2>Label Tool</h2>
+  <h2 class="gradient-animate" id="greeting">Loading...</h2>
+  <div class="datetime" id="datetime"></div>
+</div>
+
+<div class="card">
+  <h2 class="normal-heading">🚀 Amazon / Flipkart Label Tool</h2>
 
   <div id="dropZone">
     <input type="file" id="pdfUpload" accept="application/pdf" hidden>
-    Click or Upload PDF
+    <span id="dropText">Click or Drag & Drop PDF</span>
   </div>
 
   <p id="status"></p>
 
-  <button class="btn" onclick="processPDF()">Print Labels</button>
-  <button class="btn" onclick="downloadSummary()">Download Excel</button>
+  <button class="btn" onclick="processPDF()">Print Amazon Labels</button>
+  <button class="btn" onclick="processFlipkart()">Print Flipkart Labels</button>
+  <button class="btn" onclick="downloadSummary()">Download Summary Excel</button>
 
 </div>
 
 </div>
+
+<div id="loader"><div></div></div>
 
 <script>
 
-/* GLOBAL */
-let pdfBuffer=null
-let summary=[]
-let serial=1
-let orderNumber=1
-let today=new Date().toISOString().slice(0,10)
+/* DATE */
+let d=new Date()
+let today=String(d.getDate()).padStart(2,'0')+"-"+String(d.getMonth()+1).padStart(2,'0')+"-"+String(d.getFullYear()).slice(-2)
 
-/* FILE UPLOAD */
-const upload=document.getElementById("pdfUpload")
-const dropZone=document.getElementById("dropZone")
-
-dropZone.onclick=()=>upload.click()
-
-upload.addEventListener("change",handleFile)
-
-function handleFile(e){
-let file=e.target.files[0]
-if(!file)return
-let reader=new FileReader()
-reader.onload=()=>{
-pdfBuffer=reader.result
-document.getElementById("status").innerText="PDF Loaded ✅"
-}
-reader.readAsArrayBuffer(file)
-}
-
-/* LOGIN */
+/* PASSWORD */
 function checkPassword(){
-if(document.getElementById("passInput").value==="1234"){
+let pass=document.getElementById("passInput").value
+if(pass==="1234"){
 document.getElementById("loginBox").style.display="none"
 }else{
 document.getElementById("errorMsg").innerText="Wrong Password"
 }
 }
 
-/* EXTRACT */
+/* TIME */
+setInterval(()=>{
+let now=new Date()
+document.getElementById("datetime").innerText=now.toLocaleString()
+},1000)
+
+/* LOADER */
+function showLoader(){document.getElementById("loader").style.display="flex"}
+function hideLoader(){document.getElementById("loader").style.display="none"}
+
+/* FILE */
+let pdfBuffer,skuMap={},summary=[],serial=1,orderNumber=1
+
+const dropZone=document.getElementById("dropZone")
+const fileInput=document.getElementById("pdfUpload")
+
+dropZone.onclick=()=>fileInput.click()
+
+fileInput.onchange=e=>handleFile(e)
+
+function handleFile(e){
+let file=e.target.files[0]
+if(!file)return
+let reader=new FileReader()
+reader.onload=()=>{pdfBuffer=reader.result;document.getElementById("status").innerText="PDF Loaded"}
+reader.readAsArrayBuffer(file)
+}
+
+/* CSV */
+fetch("sku_map.csv")
+.then(res=>res.text())
+.then(text=>{
+text.split("\n").slice(1).forEach(r=>{
+let c=r.split(",")
+if(c.length>=2){
+if(!skuMap[c[0]]) skuMap[c[0]]=[]
+skuMap[c[0]].push(c[1])
+}
+})
+})
+
+/* 🔥 NEW EXTRACT FUNCTION */
 async function extractData(){
-if(!pdfBuffer){alert("Upload PDF");return}
 
 summary=[];serial=1;orderNumber=1
 
@@ -142,17 +212,27 @@ let qty=[...invText.matchAll(/₹[\d\.]+\s+(\d+)\s+₹/g)]
 for(let k=0;k<sku.length;k++){
 let s=sku[k][1]
 let q=qty[k]?parseInt(qty[k][1]):1
+let rep=skuMap[s]||[s]
+
+let pack=0
+rep.forEach(r=>{
+let m=r.match(/(\d+)$/)
+pack+=m?parseInt(m[1]):1
+})
+
+let pcs=pack*q
 
 summary.push({
 order:k==0?orderNumber:"",
 orderId:k==0?orderId:"",
 orderDate:k==0?orderDate:"",
-total:k==0?total:"",
-gross:k==0?gross:"",
+totalAmount:k==0?total:"",
+grossTotal:k==0?gross:"",
 sno:serial++,
 sku:s,
+replacement:rep.join(", "),
 qty:q,
-pcs:q
+pcs:pcs
 })
 }
 orderNumber++
@@ -160,27 +240,33 @@ orderNumber++
 }
 }
 
-/* PRINT */
+/* AMAZON PRINT SAME */
 async function processPDF(){
+showLoader()
 await extractData()
-alert("Print Ready (you can extend)")
+alert("Print Ready")
+hideLoader()
 }
 
-/* EXCEL */
+/* FLIPKART SAME */
+async function processFlipkart(){alert("Same as before")}
+
+/* EXCEL UPDATED */
 async function downloadSummary(){
+
 await extractData()
 
-let data=[["Order No","Order ID","Order Date","Total","Gross Total","S.No","SKU","Qty","PCS"]]
+let data=[["Order No","Order ID","Order Date","Total","Gross","S.No","SKU","Replacement","Qty","PCS"]]
 
 summary.forEach(r=>{
-data.push([r.order,r.orderId,r.orderDate,r.total,r.gross,r.sno,r.sku,r.qty,r.pcs])
+data.push([r.order,r.orderId,r.orderDate,r.totalAmount,r.grossTotal,r.sno,r.sku,r.replacement,r.qty,r.pcs])
 })
 
 let ws=XLSX.utils.aoa_to_sheet(data)
 let wb=XLSX.utils.book_new()
 XLSX.utils.book_append_sheet(wb,ws,"Summary")
 
-XLSX.writeFile(wb,"Summary_"+today+".xlsx")
+XLSX.writeFile(wb,"Amazon_"+today+".xlsx")
 }
 
 </script>
