@@ -2,7 +2,8 @@
 <html>
 <head>
 
-<title>Amazon PDF → Excel Tool</title>
+<title>Label Tool Pro</title>
+<link rel="icon" href="favicon.png">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
@@ -12,247 +13,486 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 </script>
 
+<script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <style>
+
+/* 🔥 IMPORTANT FIX */
+*, *::before, *::after{
+box-sizing:border-box;
+}
+
+/* BODY */
 body{
-font-family:Arial;
-background:linear-gradient(135deg,#667eea,#764ba2);
+font-family:Poppins, sans-serif;
+margin:0;
+padding:20px;
+min-height:100vh;
+background:linear-gradient(135deg,#0f172a,#2f0130);
 color:white;
-padding:20px;
-text-align:center;
 }
 
-.card{
-background:white;
-color:black;
-padding:20px;
-border-radius:15px;
-max-width:500px;
+/* CONTAINER */
+.container{
+max-width:650px;
 margin:auto;
-box-shadow:0 10px 30px rgba(0,0,0,0.2);
 }
 
-button{
-padding:12px 20px;
+/* CARD */
+.card{
+background:#1e2633;
+border:1px solid rgb(255, 255,255,0.15);
+padding:25px;
+border-radius:20px;
+box-shadow:0 10px 40px rgba(0,0,0,0.5);
+margin-top:20px;
+}
+
+/* LOGIN CARD */
+.login-card{
+background:#1e2633;
+padding:30px;
+border-radius:20px;
+box-shadow:0 10px 40px rgba(0,0,0,0.6);
+text-align:center;
+width:90%;
+max-width:350px;
+
+display:flex;
+flex-direction:column;
+align-items:center;
+}
+
+/* INPUT */
+.login-card input{
+width:100%;
+padding:12px;
+margin-top:10px;
+border-radius:10px;
+border:none;
+background:#0f172a;
+color:white;
+}
+
+/* BUTTON */
+.btn{
+width:100%;
+padding:12px;
 margin-top:10px;
 border:none;
-border-radius:10px;
-background:#667eea;
+border-radius:12px;
+background:linear-gradient(90deg,#6a8cff,#721978);
 color:white;
 font-weight:bold;
 cursor:pointer;
+transition:0.3s;
 }
 
+.btn:hover{
+opacity:0.85;
+}
+
+/* NORMAL HEADING */
+.normal-heading{
+font-size:22px;
+font-weight:600;
+color:#ffffff;
+}
+
+/* GRADIENT ONLY GREETING */
+.gradient-animate{
+font-size:26px;
+font-weight:700;
+
+background:linear-gradient(90deg,#ff4ecd,#6a8cff,#00d4ff,#ff4ecd);
+background-size:300%;
+
+-webkit-background-clip:text;
+-webkit-text-fill-color:transparent;
+
+animation:move 5s linear infinite;
+}
+
+@keyframes move{
+0%{background-position:0%}
+100%{background-position:300%}
+}
+
+/* DATE */
+.datetime{
+margin-top:10px;
+font-size:14px;
+color:#cbd5e1;
+}
+
+/* DROP ZONE */
+#dropZone{
+height:80px;
+border:2px dashed #6a8cff;
+padding:30px;
+text-align:center;
+border-radius:15px;
+cursor:pointer;
+margin-top:20px;
+margin-bottom:10px;
+background:#0f172a;
+transition:0.3s;
+}
+
+/* 🩷 Hover */
+#dropZone:hover{
+background:#2f0130;
+}
+
+/* 🟢 Drag */
+#dropZone.dragover{
+background: rgba(0, 200, 83, 0.15);
+border-color:#00c853;
+}
+
+/* 🟡 Uploaded */
+#dropZone.uploaded{
+background: rgba(255, 204, 0, 0.2);
+border-color:#ffcc00;
+}
+
+/* STATUS */
+#status{
+margin:0;
+min-height:16px;
+color:#94a3b8;
+font-size:14px;
+}
+
+/* LOGIN SCREEN */
+#loginBox{
+position:fixed;
+top:0;left:0;
+width:100%;height:100%;
+background:#0f172a;
+display:flex;
+justify-content:center;
+align-items:center;
+z-index:9999;
+}
+
+/* LOADER */
 #loader{
 display:none;
-margin-top:10px;
-color:yellow;
+position:fixed;
+top:0;left:0;
+width:100%;height:100%;
+background:rgba(0,0,0,0.6);
+justify-content:center;
+align-items:center;
+z-index:9999;
 }
-</style>
 
+#loader div{
+border:6px solid #333;
+border-top:6px solid #6a8cff;
+border-radius:50%;
+width:60px;height:60px;
+animation:spin 1s linear infinite;
+}
+
+@keyframes spin{
+0%{transform:rotate(0)}
+100%{transform:rotate(360deg)}
+}
+
+</style>
 </head>
 
 <body>
 
-<h2>Amazon PDF → Excel Tool</h2>
+<!-- LOGIN -->
+<div id="loginBox">
+  <div class="login-card">
+    <h2 class="normal-heading">🔐 Enter Password</h2>
+    <input type="password" id="passInput" placeholder="Enter password">
+    <button class="btn" onclick="checkPassword()">Enter</button>
+    <p id="errorMsg" style="color:red;"></p>
+  </div>
+</div>
 
+<div class="container">
+
+<!-- GREETING -->
+<div class="card">
+  <h2 class="gradient-animate" id="greeting">Loading...</h2>
+  <div class="datetime" id="datetime"></div>
+</div>
+
+<!-- TOOL -->
 <div class="card">
 
-<input type="file" id="pdfUpload">
-<br>
+  <h2 class="normal-heading">
+  🚀 Amazon / Flipkart Label Tool
+  </h2>
 
-<button onclick="extractExcel()">Download Excel</button>
+  <div id="dropZone">
+    <input type="file" id="pdfUpload" accept="application/pdf" hidden>
+    <span id="dropText">Click or Drag & Drop PDF</span>
+  </div>
 
-<p id="loader">Processing... ⏳</p>
+  <p id="status"></p>
+
+  <button class="btn" onclick="processPDF()">Print Amazon Labels</button>
+  <button class="btn" onclick="processFlipkart()">Print Flipkart Labels</button>
+  <button class="btn" onclick="downloadSummary()">Download Summary Excel</button>
 
 </div>
 
+</div>
+
+<!-- LOADER -->
+<div id="loader"><div></div></div>
+
 <script>
 
-let pdfBuffer;
-let skuMap = {};
+/* FILE */
+let pdfBuffer,skuMap={},summary=[],serial=1,orderNumber=1
 
-document.getElementById("pdfUpload").addEventListener("change",function(e){
-let file = e.target.files[0];
-if(!file) return;
+/* COMMON DATA EXTRACT FUNCTION */
+async function extractData(){
+if(!pdfBuffer){alert("Upload PDF first");return}
 
-let reader = new FileReader();
-reader.onload = function(){
-pdfBuffer = this.result;
-alert("PDF Loaded ✅");
-}
-reader.readAsArrayBuffer(file);
-});
+summary=[];serial=1;orderNumber=1
 
-// 📦 Load CSV
-async function loadCSV(){
-let res = await fetch("sku_map.csv");
-let text = await res.text();
-
-text.split("\n").forEach(line=>{
-let parts = line.split(",");
-if(parts.length>=2){
-let sku = parts[0].trim();
-let replacements = parts.slice(1).map(x=>x.trim());
-skuMap[sku] = replacements;
-}
-});
-}
-
-// 🔥 MAIN
-async function extractExcel(){
-
-if(!pdfBuffer){
-alert("Upload PDF first");
-return;
-}
-
-document.getElementById("loader").style.display = "block";
-
-await loadCSV();
-
-let data = [];
-let serial = 1;
-
-// 🔥 Categories
-const categories = ["SQ","BALL","CR","RH","HEART","4COM","3COM","MAT","GLOVES"];
-let categoryCount = {SQ:0,BALL:0,CR:0,RH:0,HEART:0,"4COM":0,"3COM":0,MAT:0,GLOVES:0};
-
-const pdf = await pdfjsLib.getDocument({data:pdfBuffer}).promise;
+const pdf=await pdfjsLib.getDocument({data:pdfBuffer}).promise
 
 for(let i=1;i<=pdf.numPages;i++){
+const page=await pdf.getPage(i)
+const text=(await page.getTextContent()).items.map(i=>i.str).join(" ")
 
-const page = await pdf.getPage(i);
-const text = (await page.getTextContent()).items.map(i=>i.str).join(" ");
-
-// 👉 LABEL PAGE
 if(!text.includes("Tax Invoice")){
+if(i>=pdf.numPages) continue
 
-if(i >= pdf.numPages) continue;
+const invoice=await pdf.getPage(i+1)
+const invText=(await invoice.getTextContent()).items.map(i=>i.str).join(" ")
 
-// 👉 NEXT PAGE = INVOICE
-const invoice = await pdf.getPage(i+1);
-const invText = (await invoice.getTextContent()).items.map(i=>i.str).join(" ");
+if(!invText.includes("Tax Invoice")) continue
 
-if(!invText.includes("Tax Invoice")) continue;
+// 🔥 EXTRA DATA
+let orderMatch = invText.match(/Order\s*(ID|Number)[:\s]*([A-Z0-9\-]+)/i)
+let orderId = orderMatch ? orderMatch[2] : ""
 
-// 🔹 ORDER INFO
-let orderNo = (invText.match(/Order Number[: ]+([\d-]+)/)||[])[1] || "";
-let orderDate = (invText.match(/Order Date[: ]+([\d.]+)/)||[])[1] || "";
+let dateMatch = invText.match(/Order\s*Date[:\s]*([\d\/\-]+)/i)
+let orderDate = dateMatch ? dateMatch[1] : ""
 
-// 🔹 ITEMS
-let sku = [...invText.matchAll(/\(\s*([A-Z0-9]+(?:-[A-Z0-9]+)+)\s*\)/g)];
-let qty = [...invText.matchAll(/₹[\d\.]+\s+(\d+)\s+₹/g)];
-let amt = [...invText.matchAll(/₹\s?([\d,]+\.\d+)/g)];
+let totalMatch = invText.match(/Total[:\s]*₹\s*([\d,\.]+)/i)
+let totalAmount = totalMatch ? totalMatch[1] : ""
 
-let orderTotal = 0;
+let grossMatch = invText.match(/(Gross\s*Total|Grand\s*Total)[:\s]*₹\s*([\d,\.]+)/i)
+let grossTotal = grossMatch ? grossMatch[2] : ""
+
+let sku=[...invText.matchAll(/\(\s*([A-Z0-9]+(?:-[A-Z0-9]+)+)\s*\)/g)]
+let qty=[...invText.matchAll(/₹[\d\.]+\s+(\d+)\s+₹/g)]
 
 for(let k=0;k<sku.length;k++){
+let s=sku[k][1]
+let q=qty[k]?parseInt(qty[k][1]):1
 
-let s = sku[k][1];
-let q = qty[k] ? parseInt(qty[k][1]) : 1;
+let rep=skuMap[s]||[s]
 
-let amount = amt[k] ? amt[k][1] : "0";
-let cleanAmt = parseFloat(amount.replace(/,/g,"")) || 0;
-
-orderTotal += cleanAmt;
-
-// 🔹 Replacement
-let rep = skuMap[s] || [s];
-
-// 🔹 PCS
-let pack = 0;
+let pack=0
 rep.forEach(r=>{
-let m = r.match(/(\d+)$/);
-pack += m ? parseInt(m[1]) : 1;
-});
-let pcs = pack * q;
+let m=r.match(/(\d+)$/)
+pack+=m?parseInt(m[1]):1
+})
 
-// 🔥 CATEGORY LOGIC
-let found = {};
+let pcs=pack*q
 
+summary.push({
+order:k==0?orderNumber:"",
+orderId:k==0?orderId:"",
+orderDate:k==0?orderDate:"",
+totalAmount:k==0?totalAmount:"",
+grossTotal:k==0?grossTotal:"",
+sno:serial++,
+sku:s,
+replacement:rep.join(", "),
+qty:q,
+pcs:pcs
+})
+}
+
+orderNumber++
+}
+}
+}
+
+/* AMAZON PRINT */
+async function processPDF(){
+if(!pdfBuffer){alert("Upload PDF first");return}
+
+showLoader()
+
+await extractData()
+
+const pdf=await pdfjsLib.getDocument({data:pdfBuffer}).promise
+const newPdf=await PDFLib.PDFDocument.create()
+const originalPdf=await PDFLib.PDFDocument.load(pdfBuffer)
+
+const normalFont=await newPdf.embedFont(PDFLib.StandardFonts.Helvetica)
+const boldFont=await newPdf.embedFont(PDFLib.StandardFonts.HelveticaBold)
+
+let index=0
+
+for(let i=1;i<=pdf.numPages;i++){
+const page=await pdf.getPage(i)
+const text=(await page.getTextContent()).items.map(i=>i.str).join(" ")
+
+if(!text.includes("Tax Invoice")){
+if(i>=pdf.numPages) continue
+
+const invoice=await pdf.getPage(i+1)
+const invText=(await invoice.getTextContent()).items.map(i=>i.str).join(" ")
+
+if(!invText.includes("Tax Invoice")) continue
+
+let items=[]
+
+let sku=[...invText.matchAll(/\(\s*([A-Z0-9]+(?:-[A-Z0-9]+)+)\s*\)/g)]
+let qty=[...invText.matchAll(/₹[\d\.]+\s+(\d+)\s+₹/g)]
+
+for(let k=0;k<sku.length;k++){
+let s=sku[k][1]
+let q=qty[k]?parseInt(qty[k][1]):1
+
+let rep=skuMap[s]||[s]
+
+let pack=0
 rep.forEach(r=>{
-r = r.toUpperCase();
+let m=r.match(/(\d+)$/)
+pack+=m?parseInt(m[1]):1
+})
 
-if(r.includes("BALL")) found["BALL"]=1;
+let pcs=pack*q
+
+items.push({name:rep.join(", "),qty:q,pcs:pcs})
+}
+
+const [p]=await newPdf.copyPages(originalPdf,[i-1])
+newPdf.addPage(p)
+
+let pageNew=newPdf.getPages().pop()
+
+for(let j=0;j<items.length;j++){
+let y=190-(j*14)
+
+let t1=items[j].name+" ×"+items[j].qty+"      "
+let t2="("+items[j].pcs+")"
+
+pageNew.drawText(t1,{x:50,y:y,size:12,font:normalFont})
+
+let width=normalFont.widthOfTextAtSize(t1,12)
+
+pageNew.drawText(t2,{
+x:50+width+5,
+y:y,
+size:12,
+font:boldFont
+})
+}
+}
+}
+
+let win=window.open(URL.createObjectURL(new Blob([await newPdf.save()],{type:"application/pdf"})))
+setTimeout(()=>{win.print()},500)
+window.onfocus=function(){hideLoader();window.onfocus=null}
+}
+
+/* EXCEL */
+async function downloadSummary(){
+
+await extractData()
+
+let data = [["Order No","Order ID","Order Date","Total Amount","Gross Total","S.No","SKU","Replacement","Qty","Total PCS","Category","Total"]]
+
+const categories = ["SQ","BALL","CR","RH","HEART","4COM","3COM","MAT","GLOVES"]
+
+let categoryCount = {SQ:0,BALL:0,CR:0,RH:0,HEART:0,"4COM":0,"3COM":0,MAT:0,GLOVES:0}
+
+summary.forEach(r=>{
+data.push([
+r.order,
+r.orderId,
+r.orderDate,
+r.totalAmount,
+r.grossTotal,
+r.sno,
+r.sku,
+r.replacement,
+r.qty,
+r.pcs
+])
+})
+
+for(let key in categoryCount){
+categoryCount[key]=0
+}
+
+summary.forEach(r=>{
+if(!r.replacement) return
+
+let qty = Number(r.qty)
+let reps = r.replacement.toUpperCase().split(",")
+
+reps.forEach(rep=>{
+rep=rep.trim()
+
+let match = rep.match(/-(\d+)\s*$/)
+let totalPieces = match ? parseInt(match[1]) : 1
+
+let found={}
+
+if(rep.includes("BALL") || rep.includes("FBALL") || rep.includes("BBALL")){
+found["BALL"]=1
+}
 
 categories.forEach(cat=>{
-if(cat==="BALL") return;
+if(cat==="BALL") return
 
-let m = r.match(new RegExp(cat+"(\\d*)"));
+if(cat==="4COM" && rep.includes("4COM")){found["4COM"]=1;return}
+if(cat==="3COM" && rep.includes("3COM")){found["3COM"]=1;return}
+
+let m=rep.match(new RegExp(cat+"(\\d*)"))
 if(m){
-let w = m[1]?parseInt(m[1]):1;
-found[cat]=w;
+let weight=m[1]?parseInt(m[1]):1
+found[cat]=weight
 }
-});
-});
+})
 
-let totalWeight = Object.values(found).reduce((a,b)=>a+b,0);
+let totalWeight=Object.values(found).reduce((a,b)=>a+b,0)
 
 if(Object.keys(found).length===1){
-let c = Object.keys(found)[0];
-categoryCount[c]+=pcs;
+let cat=Object.keys(found)[0]
+categoryCount[cat]+=qty*totalPieces
 }
 else if(totalWeight>0){
-for(let c in found){
-let val = (found[c]/totalWeight)*pcs;
-categoryCount[c]+=val;
+for(let cat in found){
+let weight=found[cat]
+let value=(weight/totalWeight)*totalPieces*qty
+categoryCount[cat]+=value
 }
 }
+})
+})
 
-// 🔹 PUSH ROW
-data.push([
-serial++,
-orderDate,
-orderNo,
-s,
-rep.join(", "),
-q,
-pcs,
-cleanAmt,
-orderTotal
-]);
+categories.forEach((cat,i)=>{
+if(!data[i+1]) data[i+1]=[]
+data[i+1][10]=cat
+data[i+1][11]=categoryCount[cat]
+})
 
-}
+let ws = XLSX.utils.aoa_to_sheet(data)
+let wb = XLSX.utils.book_new()
+XLSX.utils.book_append_sheet(wb, ws, "Summary")
 
-i++; // skip invoice page
-}
-}
-
-// ❌ No data
-if(data.length===0){
-alert("No data found ❌");
-document.getElementById("loader").style.display = "none";
-return;
-}
-
-// 🔥 ADD CATEGORY SUMMARY AT BOTTOM
-data.push([]);
-
-data.push(["","","","","","","","","","Category","Total"]);
-
-categories.forEach(cat=>{
-data.push([
-"","","","","","","","","",
-cat,
-categoryCount[cat]
-]);
-});
-
-// 📊 Excel
-let ws = XLSX.utils.aoa_to_sheet([
-["S.No","Order Date","Order No","SKU","Replacement","Qty","Total PCS","Amount","Gross Total"],
-...data
-]);
-
-let wb = XLSX.utils.book_new();
-XLSX.utils.book_append_sheet(wb, ws, "Data");
-
-XLSX.writeFile(wb,"Amazon_Data.xlsx");
-
-document.getElementById("loader").style.display = "none";
-
+XLSX.writeFile(wb, "Amazon_summary_"+today+".xlsx")
 }
 
 </script>
