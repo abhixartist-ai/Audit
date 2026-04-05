@@ -401,7 +401,12 @@ let orderDate = dateMatch ? dateMatch[1] : ""
 
 let grossTotal = 0
 
+let allAmounts = [...invText.matchAll(/₹\s*([\d,]+\.\d{2})/g)]
+  .map(m => Number(m[1].replace(/,/g,"")))
+
 let items=[]
+
+let grossTotal = 0
 
 for(let k=0;k<sku.length;k++){
 let s=sku[k][1]
@@ -417,23 +422,23 @@ pack+=m?parseInt(m[1]):1
 
 let pcs=pack*q
 
-let itemTotal = priceMatch[k] ? priceMatch[k][4].replace(/,/g,"") : 0
+let itemTotal = allAmounts[(k*4)+3] || 0
+grossTotal += itemTotal
 
 grossTotal += Number(itemTotal)
 
 items.push({name:rep.join(", "),qty:q,pcs:pcs})
 
 summary.push({
+summary.push({
 order:k==0?orderNumber:"",
-orderId:k==0?orderId:"",
-orderDate:k==0?orderDate:"",
-grossTotal:k==0?grossTotal:"",
 sno:serial++,
 sku:s,
 replacement:rep.join(", "),
 qty:q,
 pcs:pcs,
-itemTotal:itemTotal
+itemTotal: itemTotal,
+grossTotal: k==0 ? grossTotal : ""
 })
 }
 
