@@ -384,20 +384,20 @@ if(i>=pdf.numPages) continue
 const invoice=await pdf.getPage(i+1)
 const invText=(await invoice.getTextContent()).items.map(i=>i.str).join(" ")
 
-// 🔥 ORDER DATE (FULL FIX)
-let dateMatch = invText.match(/\b\d{2}\.\d{2}\.\d{4}\b/)
-let orderDate = dateMatch ? dateMatch[0] : ""
-
-let orderIdMatch = invText.match(/Order\s*Number\s*[:\-]?\s*([A-Z0-9\-]+)/i)
-
 if(!invText.includes("Tax Invoice")) continue
 
 let sku=[...invText.matchAll(/\(\s*([A-Z0-9]+(?:-[A-Z0-9]+)+)\s*\)/g)]
 let qty=[...invText.matchAll(/₹[\d\.]+\s+(\d+)\s+₹/g)]
 
-// 🔥 AMOUNT EXTRACT (NEW)
-let allAmounts = [...invText.matchAll(/₹\s*([\d,]+\.\d{2})/g)]
-  .map(m => Number(m[1].replace(/,/g,"")))
+// ✅ PRICE MATCH (FINAL TOTAL PER SKU)
+let priceMatch = [...invText.matchAll(/₹\s*([\d,]+\.\d{2})/g)]
+
+// ✅ ORDER INFO
+let orderMatch = invText.match(/Order\s*(ID|Number)[:\s]*([A-Z0-9\-]+)/i)
+let orderId = orderMatch ? orderMatch[2] : ""
+
+let dateMatch = invText.match(/Order\s*Date[:\s]*([\d]{1,2}\.[\d]{1,2}\.[\d]{4})/i)
+let orderDate = dateMatch ? dateMatch[1] : ""
 
 let items=[]
 
@@ -415,21 +415,19 @@ pack+=m?parseInt(m[1]):1
 
 let pcs=pack*q
 
-// 🔥 CORRECT TOTAL PER SKU
-let itemTotal = allAmounts[(k*4)+3] || 0
+let itemTotal = priceMatch[(k*4)+3] ? priceMatch[(k*4)+3][1].replace(/,/g,"") : 0
 
 items.push({name:rep.join(", "),qty:q,pcs:pcs})
 
 summary.push({
-orderNo:k==0?orderNumber:"",   // 🔥 counter (1,2,3...)
-orderId:k==0?orderId:"",       // 🔥 PDF wala
-date:k==0?orderDate:"",
+order:k==0?orderNumber:"",
+orderId:k==0?orderId:"",
+orderDate:k==0?orderDate:"",
 sno:serial++,
 sku:s,
 replacement:rep.join(", "),
 qty:q,
 pcs:pcs,
-
 itemTotal:itemTotal
 })
 }
@@ -491,7 +489,7 @@ window.onfocus=function(){hideLoader();window.onfocus=null}
 /* EXCEL */
 function downloadSummary(){
 
-let data = [["Order No","Order ID","Date","S.No","SKU","Replacement","Qty","Total PCS","Item Total","Category","Total"]]
+let data = [["Order No","Order Date","Order ID","S.No","SKU","Replacement","Qty","Total PCS","Item Total","Category","Total"]]
 
 // 🔥 CATEGORY LIST
 const categories = ["SQ","BALL","CR","RH","HEART","4COM","3COM","MAT","GLOVES"]
@@ -505,9 +503,9 @@ SQ:0, BALL:0, CR:0, RH:0, HEART:0,
 // 🔥 NORMAL DATA
 summary.forEach(r=>{
 data.push([
-r.orderNo,
+r.order,
+r.orderDate,
 r.orderId,
-r.date,
 r.sno,
 r.sku,
 r.replacement,
@@ -596,8 +594,8 @@ categoryCount[cat] += value   // ❌ no Math.round
 // 🔥 ADD CATEGORY TO SHEET
 categories.forEach((cat,i)=>{
 if(!data[i+1]) data[i+1] = []
-data[i+1][10] = cat
-data[i+1][11] = categoryCount[cat]
+data[i+1][9] = cat
+data[i+1][10] = categoryCount[cat]
 })
 
 // 🔥 EXPORT
