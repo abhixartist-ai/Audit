@@ -386,14 +386,20 @@ const invText=(await invoice.getTextContent()).items.map(i=>i.str).join(" ")
 
 if(!invText.includes("Tax Invoice")) continue
 
-// 🔥 NEW DATA EXTRACT
-let orderId=(invText.match(/Order.*?:\s*([A-Z0-9\-]+)/)||[])[1]||""
-let orderDate=(invText.match(/Order Date.*?:\s*([\d\/\-]+)/)||[])[1]||""
-let totalAmount=(invText.match(/Total.*?₹\s*([\d,\.]+)/)||[])[1]||""
-let grossTotal=(invText.match(/(Grand|Gross).*?₹\s*([\d,\.]+)/)||[])[2]||""
-
 let sku=[...invText.matchAll(/\(\s*([A-Z0-9]+(?:-[A-Z0-9]+)+)\s*\)/g)]
 let qty=[...invText.matchAll(/₹[\d\.]+\s+(\d+)\s+₹/g)]
+
+// ✅ PRICE MATCH (FINAL TOTAL PER SKU)
+let priceMatch = [...invText.matchAll(/₹\s*([\d,]+\.\d{2})\s+(\d+)\s+₹\s*([\d,]+\.\d{2})[\s\S]*?₹\s*([\d,]+\.\d{2})/g)]
+
+// ✅ ORDER INFO
+let orderMatch = invText.match(/Order\s*(ID|Number)[:\s]*([A-Z0-9\-]+)/i)
+let orderId = orderMatch ? orderMatch[2] : ""
+
+let dateMatch = invText.match(/Order\s*Date[:\s]*([\d]{1,2}\.[\d]{1,2}\.[\d]{4})/i)
+let orderDate = dateMatch ? dateMatch[1] : ""
+
+let grossTotal = 0
 
 let items=[]
 
@@ -411,19 +417,23 @@ pack+=m?parseInt(m[1]):1
 
 let pcs=pack*q
 
+let itemTotal = priceMatch[k] ? priceMatch[k][4].replace(/,/g,"") : 0
+
+grossTotal += Number(itemTotal)
+
 items.push({name:rep.join(", "),qty:q,pcs:pcs})
 
 summary.push({
 order:k==0?orderNumber:"",
 orderId:k==0?orderId:"",
 orderDate:k==0?orderDate:"",
-totalAmount:k==0?totalAmount:"",
 grossTotal:k==0?grossTotal:"",
 sno:serial++,
 sku:s,
 replacement:rep.join(", "),
 qty:q,
-pcs:pcs
+pcs:pcs,
+itemTotal:itemTotal
 })
 }
 
@@ -484,7 +494,7 @@ window.onfocus=function(){hideLoader();window.onfocus=null}
 /* EXCEL */
 function downloadSummary(){
 
-let data = [["Order No","Order ID","Order Date","Total","Gross","S.No","SKU","Replacement","Qty","Total PCS","Category","Total"]]
+let data = [["Order No","Order ID","Order Date","Gross Total","S.No","SKU","Replacement","Qty","Total PCS","Item Total","Category","Total"]]
 
 // 🔥 CATEGORY LIST
 const categories = ["SQ","BALL","CR","RH","HEART","4COM","3COM","MAT","GLOVES"]
@@ -501,13 +511,13 @@ data.push([
 r.order,
 r.orderId,
 r.orderDate,
-r.totalAmount,
 r.grossTotal,
 r.sno,
 r.sku,
 r.replacement,
 r.qty,
-r.pcs
+r.pcs,
+r.itemTotal
 ])
 })
 
