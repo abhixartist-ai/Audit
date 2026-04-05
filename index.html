@@ -384,29 +384,26 @@ if(i>=pdf.numPages) continue
 const invoice=await pdf.getPage(i+1)
 const invText=(await invoice.getTextContent()).items.map(i=>i.str).join(" ")
 
+// 🔥 ORDER DATE (FULL FIX)
+let dateMatch = invText.match(/\b\d{2}\.\d{2}\.\d{4}\b/)
+let orderDate = dateMatch ? dateMatch[0] : ""
+
+// 🔥 ORDER NUMBER (basic)
+let orderIdMatch = invText.match(/Order\s*(No|ID)[^\w]?[:\-]?\s*([A-Z0-9\-]+)/i)
+let orderId = orderIdMatch ? orderIdMatch[2] : orderNumber
+
 if(!invText.includes("Tax Invoice")) continue
 
 let sku=[...invText.matchAll(/\(\s*([A-Z0-9]+(?:-[A-Z0-9]+)+)\s*\)/g)]
 let qty=[...invText.matchAll(/₹[\d\.]+\s+(\d+)\s+₹/g)]
 
-// ✅ PRICE MATCH (FINAL TOTAL PER SKU)
-let priceMatch = [...invText.matchAll(/₹\s*([\d,]+\.\d{2})\s+(\d+)\s+₹\s*([\d,]+\.\d{2})[\s\S]*?₹\s*([\d,]+\.\d{2})/g)]
-
-// ✅ ORDER INFO
-let orderMatch = invText.match(/Order\s*(ID|Number)[:\s]*([A-Z0-9\-]+)/i)
-let orderId = orderMatch ? orderMatch[2] : ""
-
-let dateMatch = invText.match(/Order\s*Date[:\s]*([\d]{1,2}\.[\d]{1,2}\.[\d]{4})/i)
-let orderDate = dateMatch ? dateMatch[1] : ""
-
-let grossTotal = 0
-
+// 🔥 AMOUNT EXTRACT (NEW)
 let allAmounts = [...invText.matchAll(/₹\s*([\d,]+\.\d{2})/g)]
   .map(m => Number(m[1].replace(/,/g,"")))
 
-let items=[]
-
 let grossTotal = 0
+
+let items=[]
 
 for(let k=0;k<sku.length;k++){
 let s=sku[k][1]
@@ -422,23 +419,25 @@ pack+=m?parseInt(m[1]):1
 
 let pcs=pack*q
 
+// 🔥 CORRECT TOTAL PER SKU
 let itemTotal = allAmounts[(k*4)+3] || 0
-grossTotal += itemTotal
 
-grossTotal += Number(itemTotal)
+grossTotal += itemTotal
 
 items.push({name:rep.join(", "),qty:q,pcs:pcs})
 
 summary.push({
-summary.push({
-order:k==0?orderNumber:"",
+order:k==0?orderId:"",
+date:k==0?orderDate:"",
 sno:serial++,
 sku:s,
 replacement:rep.join(", "),
 qty:q,
 pcs:pcs,
-itemTotal: itemTotal,
-grossTotal: k==0 ? grossTotal : ""
+
+// 🔥 NEW FIELDS
+itemTotal:itemTotal,
+gross:k==0?grossTotal:""
 })
 }
 
@@ -499,7 +498,7 @@ window.onfocus=function(){hideLoader();window.onfocus=null}
 /* EXCEL */
 function downloadSummary(){
 
-let data = [["Order No","Order ID","Order Date","Gross Total","S.No","SKU","Replacement","Qty","Total PCS","Item Total","Category","Total"]]
+let data = [["Order No","Date","S.No","SKU","Replacement","Qty","Total PCS","Item Total","Gross Total","Category","Total"]]
 
 // 🔥 CATEGORY LIST
 const categories = ["SQ","BALL","CR","RH","HEART","4COM","3COM","MAT","GLOVES"]
@@ -514,15 +513,14 @@ SQ:0, BALL:0, CR:0, RH:0, HEART:0,
 summary.forEach(r=>{
 data.push([
 r.order,
-r.orderId,
-r.orderDate,
-r.grossTotal,
+r.date,
 r.sno,
 r.sku,
 r.replacement,
 r.qty,
 r.pcs,
-r.itemTotal
+r.itemTotal,
+r.gross
 ])
 })
 
@@ -605,8 +603,8 @@ categoryCount[cat] += value   // ❌ no Math.round
 // 🔥 ADD CATEGORY TO SHEET
 categories.forEach((cat,i)=>{
 if(!data[i+1]) data[i+1] = []
-data[i+1][10] = cat
-data[i+1][11] = categoryCount[cat]
+data[i+1][6] = cat
+data[i+1][7] = categoryCount[cat]
 })
 
 // 🔥 EXPORT
