@@ -388,8 +388,7 @@ const invText=(await invoice.getTextContent()).items.map(i=>i.str).join(" ")
 let dateMatch = invText.match(/\b\d{2}\.\d{2}\.\d{4}\b/)
 let orderDate = dateMatch ? dateMatch[0] : ""
 
-let orderIdMatch = invText.match(/Order\s*(No|ID)[^\w]?[:\-]?\s*([A-Z0-9\-]+)/i)
-let orderId = orderIdMatch ? orderIdMatch[2] : orderNumber
+let orderIdMatch = invText.match(/Order\s*Number\s*[:\-]?\s*([A-Z0-9\-]+)/i)
 
 if(!invText.includes("Tax Invoice")) continue
 
