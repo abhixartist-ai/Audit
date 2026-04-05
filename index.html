@@ -73,7 +73,6 @@ color:yellow;
 let pdfBuffer;
 let skuMap = {};
 
-// 📁 Load file
 document.getElementById("pdfUpload").addEventListener("change",function(e){
 let file = e.target.files[0];
 if(!file) return;
@@ -86,7 +85,6 @@ alert("PDF Loaded ✅");
 reader.readAsArrayBuffer(file);
 });
 
-// 📦 Load SKU CSV (same folder)
 async function loadCSV(){
 let res = await fetch("sku_map.csv");
 let text = await res.text();
@@ -101,7 +99,6 @@ skuMap[sku] = replacements;
 });
 }
 
-// 🔥 MAIN FUNCTION
 async function extractExcel(){
 
 if(!pdfBuffer){
@@ -116,6 +113,9 @@ await loadCSV();
 let data = [];
 let serial = 1;
 
+const categories = ["SQ","BALL","CR","RH","HEART","4COM","3COM","MAT","GLOVES"];
+let categoryCount = {SQ:0,BALL:0,CR:0,RH:0,HEART:0,"4COM":0,"3COM":0,MAT:0,GLOVES:0};
+
 const pdf = await pdfjsLib.getDocument({data:pdfBuffer}).promise;
 
 for(let i=1;i<=pdf.numPages;i++){
@@ -123,22 +123,18 @@ for(let i=1;i<=pdf.numPages;i++){
 const page = await pdf.getPage(i);
 const text = (await page.getTextContent()).items.map(i=>i.str).join(" ");
 
-// 👉 LABEL PAGE
 if(!text.includes("Tax Invoice")){
 
 if(i >= pdf.numPages) continue;
 
-// 👉 NEXT PAGE = INVOICE
 const invoice = await pdf.getPage(i+1);
 const invText = (await invoice.getTextContent()).items.map(i=>i.str).join(" ");
 
 if(!invText.includes("Tax Invoice")) continue;
 
-// ✅ ORDER DETAILS
 let orderNo = (invText.match(/Order Number[: ]+([\d-]+)/)||[])[1] || "";
 let orderDate = (invText.match(/Order Date[: ]+([\d.]+)/)||[])[1] || "";
 
-// ✅ SKU, QTY, AMOUNT
 let sku = [...invText.matchAll(/\(\s*([A-Z0-9]+(?:-[A-Z0-9]+)+)\s*\)/g)];
 let qty = [...invText.matchAll(/₹[\d\.]+\s+(\d+)\s+₹/g)];
 let amt = [...invText.matchAll(/₹\s?([\d,]+\.\d+)/g)];
@@ -155,10 +151,9 @@ let cleanAmt = parseFloat(amount.replace(/,/g,"")) || 0;
 
 orderTotal += cleanAmt;
 
-// 🔹 replacement
 let rep = skuMap[s] || [s];
 
-// 🔹 PCS calculation
+// PCS
 let pack = 0;
 rep.forEach(r=>{
 let m = r.match(/(\d+)$/);
@@ -167,6 +162,39 @@ pack += m ? parseInt(m[1]) : 1;
 
 let pcs = pack * q;
 
+// 👉 CATEGORY CALC
+let found = {};
+
+rep.forEach(r=>{
+r = r.toUpperCase();
+
+if(r.includes("BALL")) found["BALL"]=1;
+
+categories.forEach(cat=>{
+if(cat==="BALL") return;
+
+let m = r.match(new RegExp(cat+"(\\d*)"));
+if(m){
+let w = m[1]?parseInt(m[1]):1;
+found[cat]=w;
+}
+});
+});
+
+let totalWeight = Object.values(found).reduce((a,b)=>a+b,0);
+
+if(Object.keys(found).length===1){
+let c = Object.keys(found)[0];
+categoryCount[c]+=pcs;
+}
+else if(totalWeight>0){
+for(let c in found){
+let val = (found[c]/totalWeight)*pcs;
+categoryCount[c]+=val;
+}
+}
+
+// push row
 data.push([
 serial++,
 orderDate,
@@ -176,30 +204,37 @@ rep.join(", "),
 q,
 pcs,
 cleanAmt,
-"" // gross later
+"", // gross
+"", // category
+""  // total
 ]);
 
 }
 
-// 🔹 add gross total
+// gross total
 data.slice(-sku.length).forEach(r=>{
 r[8] = orderTotal;
 });
 
-i++; // skip invoice page
+i++;
 }
 }
 
-// ❌ no data
-if(data.length === 0){
+// 👉 ADD CATEGORY TO EXCEL
+categories.forEach((cat,i)=>{
+if(!data[i]) return;
+data[i][9] = cat;
+data[i][10] = categoryCount[cat];
+});
+
+if(data.length===0){
 alert("No data found ❌");
 document.getElementById("loader").style.display = "none";
 return;
 }
 
-// 📊 Excel
 let ws = XLSX.utils.aoa_to_sheet([
-["S.No","Order Date","Order No","SKU","Replacement","Qty","Total PCS","Amount","Gross Total"],
+["S.No","Order Date","Order No","SKU","Replacement","Qty","Total PCS","Amount","Gross Total","Category","Category Total"],
 ...data
 ]);
 
