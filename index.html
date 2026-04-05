@@ -385,6 +385,7 @@ const invoice=await pdf.getPage(i+1)
 const invText=(await invoice.getTextContent()).items.map(i=>i.str).join(" ")
 
 if(!invText.includes("Tax Invoice")) continue
+
 // 🔥 NEW DATA EXTRACT
 let orderId=(invText.match(/Order.*?:\s*([A-Z0-9\-]+)/)||[])[1]||""
 let orderDate=(invText.match(/Order Date.*?:\s*([\d\/\-]+)/)||[])[1]||""
@@ -508,6 +509,7 @@ r.replacement,
 r.qty,
 r.pcs
 ])
+})
 
 // 🔥 RESET
 for(let key in categoryCount){
