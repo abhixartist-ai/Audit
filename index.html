@@ -3,8 +3,6 @@
 <head>
 
 <title>Label Tool Pro</title>
-<link rel="icon" href="favicon.png">
-
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
@@ -17,122 +15,105 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <style>
-*, *::before, *::after{box-sizing:border-box;}
 body{
 font-family:Poppins, sans-serif;
-margin:0;padding:20px;min-height:100vh;
+margin:0;padding:20px;
 background:linear-gradient(135deg,#0f172a,#2f0130);
 color:white;
 }
 .container{max-width:650px;margin:auto;}
 .card{
-background:#1e2633;border:1px solid rgb(255,255,255,0.15);
-padding:25px;border-radius:20px;
-box-shadow:0 10px 40px rgba(0,0,0,0.5);margin-top:20px;
-}
-.login-card{
-background:#1e2633;padding:30px;border-radius:20px;
-box-shadow:0 10px 40px rgba(0,0,0,0.6);
-text-align:center;width:90%;max-width:350px;
-display:flex;flex-direction:column;align-items:center;
-}
-.login-card input{
-width:100%;padding:12px;margin-top:10px;
-border-radius:10px;border:none;background:#0f172a;color:white;
+background:#1e2633;
+padding:25px;border-radius:20px;margin-top:20px;
 }
 .btn{
 width:100%;padding:12px;margin-top:10px;
 border:none;border-radius:12px;
 background:linear-gradient(90deg,#6a8cff,#721978);
-color:white;font-weight:bold;cursor:pointer;transition:0.3s;
+color:white;font-weight:bold;cursor:pointer;
 }
-.btn:hover{opacity:0.85;}
-.normal-heading{font-size:22px;font-weight:600;color:#ffffff;}
-.gradient-animate{
-font-size:26px;font-weight:700;
-background:linear-gradient(90deg,#ff4ecd,#6a8cff,#00d4ff,#ff4ecd);
-background-size:300%;
--webkit-background-clip:text;
--webkit-text-fill-color:transparent;
-animation:move 5s linear infinite;
-}
-@keyframes move{0%{background-position:0%}100%{background-position:300%}}
-.datetime{margin-top:10px;font-size:14px;color:#cbd5e1;}
 #dropZone{
-height:80px;border:2px dashed #6a8cff;
+border:2px dashed #6a8cff;
 padding:30px;text-align:center;border-radius:15px;
-cursor:pointer;margin-top:20px;margin-bottom:10px;
-background:#0f172a;transition:0.3s;
+cursor:pointer;margin-top:20px;
 }
-#dropZone:hover{background:#2f0130;}
-#dropZone.dragover{background:rgba(0,200,83,0.15);border-color:#00c853;}
-#dropZone.uploaded{background:rgba(255,204,0,0.2);border-color:#ffcc00;}
-#status{margin:0;min-height:16px;color:#94a3b8;font-size:14px;}
 #loginBox{
 position:fixed;top:0;left:0;width:100%;height:100%;
-background:#0f172a;display:flex;justify-content:center;
-align-items:center;z-index:9999;
+background:#0f172a;display:flex;justify-content:center;align-items:center;
 }
-#loader{
-display:none;position:fixed;top:0;left:0;
-width:100%;height:100%;background:rgba(0,0,0,0.6);
-justify-content:center;align-items:center;z-index:9999;
-}
-#loader div{
-border:6px solid #333;border-top:6px solid #6a8cff;
-border-radius:50%;width:60px;height:60px;
-animation:spin 1s linear infinite;
-}
-@keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
 </style>
 </head>
 
 <body>
 
 <div id="loginBox">
-  <div class="login-card">
-    <h2 class="normal-heading">🔐 Enter Password</h2>
-    <input type="password" id="passInput" placeholder="Enter password">
+  <div class="card">
+    <h2>Enter Password</h2>
+    <input type="password" id="passInput">
     <button class="btn" onclick="checkPassword()">Enter</button>
-    <p id="errorMsg" style="color:red;"></p>
+    <p id="errorMsg"></p>
   </div>
 </div>
 
 <div class="container">
 
 <div class="card">
-  <h2 class="gradient-animate" id="greeting">Loading...</h2>
-  <div class="datetime" id="datetime"></div>
-</div>
-
-<div class="card">
-  <h2 class="normal-heading">🚀 Amazon / Flipkart Label Tool</h2>
+  <h2>Label Tool</h2>
 
   <div id="dropZone">
     <input type="file" id="pdfUpload" accept="application/pdf" hidden>
-    <span id="dropText">Click or Drag & Drop PDF</span>
+    Click or Upload PDF
   </div>
 
   <p id="status"></p>
 
-  <button class="btn" onclick="processPDF()">Print Amazon Labels</button>
-  <button class="btn" onclick="processFlipkart()">Print Flipkart Labels</button>
-  <button class="btn" onclick="downloadSummary()">Download Summary Excel</button>
+  <button class="btn" onclick="processPDF()">Print Labels</button>
+  <button class="btn" onclick="downloadSummary()">Download Excel</button>
 
 </div>
 
 </div>
-
-<div id="loader"><div></div></div>
 
 <script>
 
-/* FILE */
-let pdfBuffer,skuMap={},summary=[],serial=1,orderNumber=1
+/* GLOBAL */
+let pdfBuffer=null
+let summary=[]
+let serial=1
+let orderNumber=1
+let today=new Date().toISOString().slice(0,10)
 
-/* COMMON FUNCTION */
+/* FILE UPLOAD */
+const upload=document.getElementById("pdfUpload")
+const dropZone=document.getElementById("dropZone")
+
+dropZone.onclick=()=>upload.click()
+
+upload.addEventListener("change",handleFile)
+
+function handleFile(e){
+let file=e.target.files[0]
+if(!file)return
+let reader=new FileReader()
+reader.onload=()=>{
+pdfBuffer=reader.result
+document.getElementById("status").innerText="PDF Loaded ✅"
+}
+reader.readAsArrayBuffer(file)
+}
+
+/* LOGIN */
+function checkPassword(){
+if(document.getElementById("passInput").value==="1234"){
+document.getElementById("loginBox").style.display="none"
+}else{
+document.getElementById("errorMsg").innerText="Wrong Password"
+}
+}
+
+/* EXTRACT */
 async function extractData(){
-if(!pdfBuffer){alert("Upload PDF first");return}
+if(!pdfBuffer){alert("Upload PDF");return}
 
 summary=[];serial=1;orderNumber=1
 
@@ -150,140 +131,56 @@ const invText=(await invoice.getTextContent()).items.map(i=>i.str).join(" ")
 
 if(!invText.includes("Tax Invoice")) continue
 
-let orderMatch = invText.match(/Order\s*(ID|Number)[:\s]*([A-Z0-9\-]+)/i)
-let orderId = orderMatch ? orderMatch[2] : ""
+let orderId=(invText.match(/Order.*?:\s*([A-Z0-9\-]+)/)||[])[1]||""
+let orderDate=(invText.match(/Order Date.*?:\s*([\d\/\-]+)/)||[])[1]||""
+let total=(invText.match(/Total.*?₹\s*([\d,\.]+)/)||[])[1]||""
+let gross=(invText.match(/(Grand|Gross).*?₹\s*([\d,\.]+)/)||[])[2]||""
 
-let dateMatch = invText.match(/Order\s*Date[:\s]*([\d\/\-]+)/i)
-let orderDate = dateMatch ? dateMatch[1] : ""
-
-let totalMatch = invText.match(/Total[:\s]*₹\s*([\d,\.]+)/i)
-let totalAmount = totalMatch ? totalMatch[1] : ""
-
-let grossMatch = invText.match(/(Gross\s*Total|Grand\s*Total)[:\s]*₹\s*([\d,\.]+)/i)
-let grossTotal = grossMatch ? grossMatch[2] : ""
-
-let sku=[...invText.matchAll(/\(\s*([A-Z0-9]+(?:-[A-Z0-9]+)+)\s*\)/g)]
+let sku=[...invText.matchAll(/\(\s*([A-Z0-9\-]+)\s*\)/g)]
 let qty=[...invText.matchAll(/₹[\d\.]+\s+(\d+)\s+₹/g)]
 
 for(let k=0;k<sku.length;k++){
 let s=sku[k][1]
 let q=qty[k]?parseInt(qty[k][1]):1
-
-let rep=skuMap[s]||[s]
-
-let pack=0
-rep.forEach(r=>{
-let m=r.match(/(\d+)$/)
-pack+=m?parseInt(m[1]):1
-})
-
-let pcs=pack*q
 
 summary.push({
 order:k==0?orderNumber:"",
 orderId:k==0?orderId:"",
 orderDate:k==0?orderDate:"",
-totalAmount:k==0?totalAmount:"",
-grossTotal:k==0?grossTotal:"",
+total:k==0?total:"",
+gross:k==0?gross:"",
 sno:serial++,
 sku:s,
-replacement:rep.join(", "),
 qty:q,
-pcs:pcs
+pcs:q
 })
 }
-
 orderNumber++
 }
 }
 }
 
-/* AMAZON PRINT */
+/* PRINT */
 async function processPDF(){
-showLoader()
 await extractData()
-
-const pdf=await pdfjsLib.getDocument({data:pdfBuffer}).promise
-const newPdf=await PDFLib.PDFDocument.create()
-const originalPdf=await PDFLib.PDFDocument.load(pdfBuffer)
-
-const normalFont=await newPdf.embedFont(PDFLib.StandardFonts.Helvetica)
-const boldFont=await newPdf.embedFont(PDFLib.StandardFonts.HelveticaBold)
-
-for(let i=1;i<=pdf.numPages;i++){
-const page=await pdf.getPage(i)
-const text=(await page.getTextContent()).items.map(i=>i.str).join(" ")
-
-if(!text.includes("Tax Invoice")){
-if(i>=pdf.numPages) continue
-
-const invoice=await pdf.getPage(i+1)
-const invText=(await invoice.getTextContent()).items.map(i=>i.str).join(" ")
-
-if(!invText.includes("Tax Invoice")) continue
-
-let items=[]
-let sku=[...invText.matchAll(/\(\s*([A-Z0-9]+(?:-[A-Z0-9]+)+)\s*\)/g)]
-let qty=[...invText.matchAll(/₹[\d\.]+\s+(\d+)\s+₹/g)]
-
-for(let k=0;k<sku.length;k++){
-let s=sku[k][1]
-let q=qty[k]?parseInt(qty[k][1]):1
-let rep=skuMap[s]||[s]
-
-let pack=0
-rep.forEach(r=>{
-let m=r.match(/(\d+)$/)
-pack+=m?parseInt(m[1]):1
-})
-
-let pcs=pack*q
-items.push({name:rep.join(", "),qty:q,pcs:pcs})
+alert("Print Ready (you can extend)")
 }
-
-const [p]=await newPdf.copyPages(originalPdf,[i-1])
-newPdf.addPage(p)
-
-let pageNew=newPdf.getPages().pop()
-
-for(let j=0;j<items.length;j++){
-let y=190-(j*14)
-let t1=items[j].name+" ×"+items[j].qty+"      "
-let t2="("+items[j].pcs+")"
-
-pageNew.drawText(t1,{x:50,y:y,size:12,font:normalFont})
-let width=normalFont.widthOfTextAtSize(t1,12)
-
-pageNew.drawText(t2,{x:50+width+5,y:y,size:12,font:boldFont})
-}
-}
-}
-
-let win=window.open(URL.createObjectURL(new Blob([await newPdf.save()],{type:"application/pdf"})))
-setTimeout(()=>{win.print()},500)
-window.onfocus=function(){hideLoader();window.onfocus=null}
-}
-
-/* FLIPKART SAME */
-async function processFlipkart(){ /* unchanged */ }
 
 /* EXCEL */
 async function downloadSummary(){
 await extractData()
 
-let data=[["Order No","Order ID","Order Date","Total Amount","Gross Total","S.No","SKU","Replacement","Qty","Total PCS","Category","Total"]]
+let data=[["Order No","Order ID","Order Date","Total","Gross Total","S.No","SKU","Qty","PCS"]]
 
 summary.forEach(r=>{
-data.push([r.order,r.orderId,r.orderDate,r.totalAmount,r.grossTotal,r.sno,r.sku,r.replacement,r.qty,r.pcs])
+data.push([r.order,r.orderId,r.orderDate,r.total,r.gross,r.sno,r.sku,r.qty,r.pcs])
 })
 
-// 👉 rest same (no change in category logic)
+let ws=XLSX.utils.aoa_to_sheet(data)
+let wb=XLSX.utils.book_new()
+XLSX.utils.book_append_sheet(wb,ws,"Summary")
 
-let ws = XLSX.utils.aoa_to_sheet(data)
-let wb = XLSX.utils.book_new()
-XLSX.utils.book_append_sheet(wb, ws, "Summary")
-
-XLSX.writeFile(wb, "Amazon_summary_"+today+".xlsx")
+XLSX.writeFile(wb,"Summary_"+today+".xlsx")
 }
 
 </script>
