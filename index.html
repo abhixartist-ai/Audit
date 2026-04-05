@@ -388,7 +388,6 @@ const invText=(await invoice.getTextContent()).items.map(i=>i.str).join(" ")
 let dateMatch = invText.match(/\b\d{2}\.\d{2}\.\d{4}\b/)
 let orderDate = dateMatch ? dateMatch[0] : ""
 
-// 🔥 ORDER NUMBER (basic)
 let orderIdMatch = invText.match(/Order\s*(No|ID)[^\w]?[:\-]?\s*([A-Z0-9\-]+)/i)
 let orderId = orderIdMatch ? orderIdMatch[2] : orderNumber
 
@@ -423,14 +422,15 @@ let itemTotal = allAmounts[(k*4)+3] || 0
 items.push({name:rep.join(", "),qty:q,pcs:pcs})
 
 summary.push({
-order:k==0?orderId:"",
+orderNo:k==0?orderNumber:"",   // 🔥 counter (1,2,3...)
+orderId:k==0?orderId:"",       // 🔥 PDF wala
 date:k==0?orderDate:"",
-order:k==0?orderNumber:"",
 sno:serial++,
 sku:s,
 replacement:rep.join(", "),
 qty:q,
 pcs:pcs,
+
 itemTotal:itemTotal
 })
 }
@@ -492,7 +492,7 @@ window.onfocus=function(){hideLoader();window.onfocus=null}
 /* EXCEL */
 function downloadSummary(){
 
-let data = [["Order No","Date","Order ID","S.No","SKU","Replacement","Qty","Total PCS","Item Total","Category","Total"]]
+let data = [["Order No","Order ID","Date","S.No","SKU","Replacement","Qty","Total PCS","Item Total","Category","Total"]]
 
 // 🔥 CATEGORY LIST
 const categories = ["SQ","BALL","CR","RH","HEART","4COM","3COM","MAT","GLOVES"]
@@ -506,9 +506,9 @@ SQ:0, BALL:0, CR:0, RH:0, HEART:0,
 // 🔥 NORMAL DATA
 summary.forEach(r=>{
 data.push([
-r.order,
+r.orderNo,
+r.orderId,
 r.date,
-r.orderId
 r.sno,
 r.sku,
 r.replacement,
