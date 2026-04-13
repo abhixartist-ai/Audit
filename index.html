@@ -14,7 +14,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
 </script>
 
 <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <style>
 
@@ -489,17 +489,18 @@ window.onfocus=function(){hideLoader();window.onfocus=null}
 /* EXCEL */
 function downloadSummary(){
 
-let data = [["Order No","Order Date","Order ID","S.No","SKU","Replacement","Qty","Total PCS","Item Total","Category","Total","10:00 AM","12:00 PM","1:00 PM","1:30 PM"]]
+let data = [["Order No","Order Date","Order ID","S.No","SKU","Replacement","Qty","Total PCS","Item Total","Category","Total"]]
 
 // 🔥 CATEGORY LIST
 const categories = ["SQ","BALL","CR","RH","HEART","4COM","3COM","MAT","GLOVES"]
 
+// 🔥 COUNT OBJECT
 let categoryCount = {
 SQ:0, BALL:0, CR:0, RH:0, HEART:0,
 "4COM":0, "3COM":0, MAT:0, GLOVES:0
 }
 
-// 🔥 DATA PUSH
+// 🔥 NORMAL DATA
 summary.forEach(r=>{
 data.push([
 r.order,
@@ -514,169 +515,91 @@ r.itemTotal
 ])
 })
 
-// 🔥 CATEGORY LOGIC (same as before)
-for(let key in categoryCount){ categoryCount[key]=0 }
+// 🔥 RESET
+for(let key in categoryCount){
+categoryCount[key] = 0
+}
 
+// 🔥 MAIN LOGIC (FIXED)
 summary.forEach(r=>{
+
 if(!r.replacement) return
+
 let qty = Number(r.qty)
+
+// 👉 SPLIT multiple replacements
 let reps = r.replacement.toUpperCase().split(",")
 
 reps.forEach(rep=>{
+
 rep = rep.trim()
+
+// 👉 last number
 let match = rep.match(/-(\d+)\s*$/)
 let totalPieces = match ? parseInt(match[1]) : 1
 
+// 👉 detect categories with weight
 let found = {}
 
-if(rep.includes("BALL")) found["BALL"]=1
+// BALL special
+if(rep.includes("BALL") || rep.includes("FBALL") || rep.includes("BBALL")){
+found["BALL"] = 1
+}
 
+// other categories
 categories.forEach(cat=>{
-if(cat==="BALL") return
 
-if(cat==="4COM" && rep.includes("4COM")) found["4COM"]=1
-else if(cat==="3COM" && rep.includes("3COM")) found["3COM"]=1
-else{
+if(cat === "BALL") return
+
+if(cat === "4COM" && rep.includes("4COM")){
+found["4COM"] = 1
+return
+}
+if(cat === "3COM" && rep.includes("3COM")){
+found["3COM"] = 1
+return
+}
+
 let m = rep.match(new RegExp(cat + "(\\d*)"))
+
 if(m){
-let w = m[1]?parseInt(m[1]):1
-found[cat]=w
+let weight = m[1] ? parseInt(m[1]) : 1
+found[cat] = weight
 }
-}
+
 })
 
+// 👉 APPLY LOGIC
 let totalWeight = Object.values(found).reduce((a,b)=>a+b,0)
 
-if(Object.keys(found).length===1){
+// ✅ single category
+if(Object.keys(found).length === 1){
 let cat = Object.keys(found)[0]
-categoryCount[cat]+= qty*totalPieces
+categoryCount[cat] += qty * totalPieces
 }
-else if(totalWeight>0){
+
+// ✅ multiple category (EXACT no rounding)
+else if(totalWeight > 0){
 for(let cat in found){
-let val = (found[cat]/totalWeight)*totalPieces*qty
-categoryCount[cat]+= val
+let weight = found[cat]
+let value = (weight / totalWeight) * totalPieces * qty
+categoryCount[cat] += value   // ❌ no Math.round
 }
 }
-})
+
 })
 
-// 🔥 CATEGORY COLUMN ADD
+})
+
+// 🔥 ADD CATEGORY TO SHEET
 categories.forEach((cat,i)=>{
-if(!data[i+1]) data[i+1]=[]
-data[i+1][9]=cat
-data[i+1][10]=categoryCount[cat]
+if(!data[i+1]) data[i+1] = []
+data[i+1][9] = cat
+data[i+1][10] = categoryCount[cat]
 })
 
-// 🔥 SHEET
+// 🔥 EXPORT
 let ws = XLSX.utils.aoa_to_sheet(data)
-
-// ================================
-// 🎨 STYLING PART (MAIN)
-// ================================
-
-// HEADER STYLE
-for(let col=0; col<=14; col++){
-let cell = XLSX.utils.encode_cell({r:0,c:col})
-if(!ws[cell]) continue
-
-ws[cell].s = {
-font:{bold:true},
-alignment:{horizontal:"center",vertical:"center"},
-fill:{
-fgColor:{rgb:
-col<=8 ? "FFFF00" :   // A-I yellow
-col<=10 ? "C0C0C0" :  // J-K grey
-"E7E6E6"              // L-O light grey
-}
-}
-}
-}
-
-// 🔥 ROW HEIGHT
-ws["!rows"] = [{hpx:30}]
-
-// 🔥 FORMULAS K2 to K10
-for(let i=1;i<=9;i++){
-let row = i+1
-ws["K"+row] = {
-f:`SUM(L${row}:O${row})`,
-s:{font:{bold:true}}
-}
-}
-
-// 🔥 TOTAL K11
-ws["K11"] = {
-f:`SUM(K2:K10)`,
-s:{
-font:{bold:true},
-fill:{fgColor:{rgb:"FFFF00"}}
-}
-}
-
-// 🔥 BOLD K2 to K11
-for(let i=2;i<=11;i++){
-let cell = "K"+i
-if(ws[cell]){
-ws[cell].s = {font:{bold:true}}
-}
-}
-
-// ================================
-// 🔲 BORDER
-// ================================
-
-let range = XLSX.utils.decode_range(ws["!ref"])
-
-// 👉 Horizontal full
-for(let R=0; R<=range.e.r; R++){
-for(let C=0; C<=range.e.c; C++){
-let cell = XLSX.utils.encode_cell({r:R,c:C})
-if(!ws[cell]) continue
-
-ws[cell].s = ws[cell].s || {}
-ws[cell].s.border = {
-top:{style:"thin"},
-bottom:{style:"thin"}
-}
-}
-}
-
-// 👉 Vertical A to I
-for(let R=0; R<=range.e.r; R++){
-for(let C=0; C<=8; C++){
-let cell = XLSX.utils.encode_cell({r:R,c:C})
-if(!ws[cell]) continue
-
-ws[cell].s = ws[cell].s || {}
-ws[cell].s.border = {
-left:{style:"thin"},
-right:{style:"thin"}
-}
-}
-}
-
-// 👉 Block border J1 to O10
-for(let R=0; R<=9; R++){
-for(let C=9; C<=14; C++){
-let cell = XLSX.utils.encode_cell({r:R,c:C})
-if(!ws[cell]) continue
-
-ws[cell].s = ws[cell].s || {}
-ws[cell].s.border = {
-top:{style:"thin"},
-bottom:{style:"thin"},
-left:{style:"thin"},
-right:{style:"thin"}
-}
-}
-}
-
-// 🔥 AUTO WIDTH
-ws["!cols"] = new Array(15).fill({wch:15})
-
-// ================================
-// EXPORT
-// ================================
 let wb = XLSX.utils.book_new()
 XLSX.utils.book_append_sheet(wb, ws, "Summary")
 
