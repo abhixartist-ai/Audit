@@ -593,16 +593,9 @@ categoryCount[cat] += value   // ❌ no Math.round
 
 // 🔥 ADD CATEGORY TO SHEET
 categories.forEach((cat,i)=>{
-    if(!data[i+1]) data[i+1] = []
-
-    // Category (same)
-    data[i+1][9] = cat
-
-    // Count shifted to 13th column (M)
-    data[i+1][12] = categoryCount[cat]
-
-    // Column K me row-wise sum (L to O)
-    data[i+1][10] = `=SUM(L${i+2}:O${i+2})`
+if(!data[i+1]) data[i+1] = []
+data[i+1][9] = cat
+data[i+1][10] = categoryCount[cat]
 })
 
 // 🔥 EXPORT
