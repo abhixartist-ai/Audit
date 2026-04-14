@@ -605,9 +605,6 @@ categories.forEach((cat,i)=>{
     data[i+1][10] = `=SUM(L${i+2}:O${i+2})`
 })
 
-// Last row total (K11)
-data[10][10] = `=SUM(K2:K10)`
-
 // 🔥 EXPORT
 let ws = XLSX.utils.aoa_to_sheet(data)
 let wb = XLSX.utils.book_new()
