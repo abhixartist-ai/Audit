@@ -14,7 +14,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
 </script>
 
 <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <style>
 
@@ -602,113 +602,7 @@ data[i+1][11] = categoryCount[cat]
 let ws = XLSX.utils.aoa_to_sheet(data)
 let wb = XLSX.utils.book_new()
 XLSX.utils.book_append_sheet(wb, ws, "Summary")
-// ================== FORMATTING ==================
 
-// 👉 Row height (Row 1 = 30)
-ws['!rows'] = ws['!rows'] || []
-ws['!rows'][0] = { hpx: 30 }
-
-// 👉 Loop for cells
-for(let r=0; r<=10; r++){
-  for(let c=0; c<=14; c++){
-
-    let cellRef = XLSX.utils.encode_cell({r:r, c:c})
-    if(!ws[cellRef]) continue
-
-    ws[cellRef].s = ws[cellRef].s || {}
-
-    // 👉 ALIGN CENTER + MIDDLE
-    ws[cellRef].s.alignment = {
-      horizontal: "center",
-      vertical: "center"
-    }
-
-    // 👉 HEADER (ROW 1)
-    if(r === 0){
-      ws[cellRef].s.font = { bold: true }
-
-      // A1 to I1 = Grey
-      if(c <= 8){
-        ws[cellRef].s.fill = {
-          fgColor: { rgb: "D9D9D9" }
-        }
-      }
-
-      // J1 K1 = Dark Grey
-      else if(c === 9 || c === 10){
-        ws[cellRef].s.fill = {
-          fgColor: { rgb: "808080" }
-        }
-      }
-
-      // L1 to O1 = Light Grey
-      else if(c >= 11){
-        ws[cellRef].s.fill = {
-          fgColor: { rgb: "EDEDED" }
-        }
-      }
-    }
-
-    // 👉 K2 to K11 bold
-    if(c === 10 && r >= 1 && r <= 10){
-      ws[cellRef].s.font = { bold: true }
-    }
-
-    // 👉 K11 Yellow fill
-    if(c === 10 && r === 10){
-      ws[cellRef].s.fill = {
-        fgColor: { rgb: "FFF200" }
-      }
-    }
-
-    // 👉 BORDER
-    ws[cellRef].s.border = {
-      top: {style:"thin"},
-      bottom: {style:"thin"},
-      left: {style:"thin"},
-      right: {style:"thin"}
-    }
-
-  }
-}
-// ================== FORMULAS ==================
-
-// 👉 K2 to K10 (L to O sum)
-for(let i=2; i<=10; i++){
-  let cell = "K"+i
-  ws[cell] = {
-    t: "n",
-    f: `SUM(L${i}:O${i})`
-  }
-}
-
-// 👉 K11 = total sum
-ws["K11"] = {
-  t: "n",
-  f: "SUM(K2:K10)",
-  s: {
-    font: { bold: true },
-    fill: { fgColor: { rgb: "FFF200" } },
-    alignment: { horizontal: "center", vertical: "center" }
-  }
-}
-// 👉 Special border block J1 to O10
-for(let r=0; r<=9; r++){
-  for(let c=9; c<=14; c++){
-
-    let ref = XLSX.utils.encode_cell({r:r, c:c})
-    if(!ws[ref]) ws[ref] = {}
-
-    ws[ref].s = ws[ref].s || {}
-
-    ws[ref].s.border = {
-      top: {style:"medium"},
-      bottom: {style:"medium"},
-      left: {style:"medium"},
-      right: {style:"medium"}
-    }
-  }
-}
 XLSX.writeFile(wb, "Amazon_summary_"+today+".xlsx")
 }
 
