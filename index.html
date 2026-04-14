@@ -15,7 +15,6 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
 
 <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
 
 <style>
 
@@ -488,9 +487,9 @@ window.onfocus=function(){hideLoader();window.onfocus=null}
 }
 
 /* EXCEL */
-async function downloadSummary(){
+function downloadSummary(){
 
-let data = [["Order No","Order Date","Order ID","S.No","SKU","Replacement","Qty","Total PCS","Item Total","Category","Total","10:00 am","12:00 pm","1:00 pm","1:30 pm"]]
+let data = [["Order No","Order Date","Order ID","S.No","SKU","Replacement","Qty","Total PCS","Item Total","Category","Total"]]
 
 // 🔥 CATEGORY LIST
 const categories = ["SQ","BALL","CR","RH","HEART","4COM","3COM","MAT","GLOVES"]
@@ -596,94 +595,15 @@ categoryCount[cat] += value   // ❌ no Math.round
 categories.forEach((cat,i)=>{
 if(!data[i+1]) data[i+1] = []
 data[i+1][9] = cat
-data[i+1][11] = categoryCount[cat]
+data[i+1][10] = categoryCount[cat]
 })
 
 // 🔥 EXPORT
-let workbook = new ExcelJS.Workbook();
-let sheet = workbook.addWorksheet("Summary");
+let ws = XLSX.utils.aoa_to_sheet(data)
+let wb = XLSX.utils.book_new()
+XLSX.utils.book_append_sheet(wb, ws, "Summary")
 
-// DATA ADD
-data.forEach(r => sheet.addRow(r));
-
-// ROW HEIGHT
-sheet.getRow(1).height = 30;
-
-// ALIGN + BOLD
-sheet.getRow(1).eachCell(cell=>{
-  cell.alignment = { vertical:"middle", horizontal:"center" };
-  cell.font = { bold:true };
-});
-
-// COLORS
-for(let i=1;i<=9;i++){
-  sheet.getRow(1).getCell(i).fill = {
-    type:'pattern', pattern:'solid', fgColor:{argb:'808080'}
-  };
-}
-
-["J1","K1"].forEach(c=>{
-  sheet.getCell(c).fill = {
-    type:'pattern', pattern:'solid', fgColor:{argb:'404040'}
-  };
-});
-
-for(let i=12;i<=15;i++){
-  sheet.getRow(1).getCell(i).fill = {
-    type:'pattern', pattern:'solid', fgColor:{argb:'D3D3D3'}
-  };
-}
-
-// FORMULA K2–K10
-for(let i=2;i<=10;i++){
-  sheet.getCell(`K${i}`).value = { formula:`SUM(L${i}:O${i})` };
-  sheet.getCell(`K${i}`).font = { bold:true };
-}
-
-// K11 TOTAL
-sheet.getCell("K11").value = { formula:"SUM(K2:K10)" };
-sheet.getCell("K11").font = { bold:true };
-sheet.getCell("K11").fill = {
-  type:'pattern', pattern:'solid', fgColor:{argb:'FFFF00'}
-};
-
-// BORDER
-function border(cell){
-  cell.border = {
-    top:{style:'thin'},
-    left:{style:'thin'},
-    bottom:{style:'thin'},
-    right:{style:'thin'}
-  };
-}
-
-// FULL GRID
-for(let r=1;r<=11;r++){
-  for(let c=1;c<=15;c++){
-    border(sheet.getRow(r).getCell(c));
-  }
-}
-
-// BLOCK BORDER J1–O10
-for(let r=1;r<=10;r++){
-  for(let c=10;c<=15;c++){
-    border(sheet.getRow(r).getCell(c));
-  }
-}
-
-// AUTO WIDTH
-sheet.columns.forEach(col=>{
-  col.width = 15;
-});
-
-// DOWNLOAD
-let buffer = await workbook.xlsx.writeBuffer();
-let blob = new Blob([buffer], {type:"application/octet-stream"});
-
-let link = document.createElement("a");
-link.href = URL.createObjectURL(blob);
-link.download = "Amazon_summary_"+today+".xlsx";
-link.click();
+XLSX.writeFile(wb, "Amazon_summary_"+today+".xlsx")
 }
 
 </script>
