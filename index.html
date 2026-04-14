@@ -605,7 +605,8 @@ let ws = XLSX.utils.aoa_to_sheet(data)
 // ===============================
 
 // 📏 Row height (Row 1 = 30)
-ws["!rows"] = [{ hpt: 30 }]
+ws["!rows"] = []
+ws["!rows"][0] = { hpt: 30 }
 
 // 📌 helper for cell existence
 function cell(r, c){
