@@ -489,7 +489,7 @@ window.onfocus=function(){hideLoader();window.onfocus=null}
 /* EXCEL */
 function downloadSummary(){
 
-let data = [["Order No","Order Date","Order ID","S.No","SKU","Replacement","Qty","Total PCS","Item Total","Category","Total"]]
+let data = [["Order No","Order Date","Order ID","S.No","SKU","Replacement","Qty","Total PCS","Item Total","Category","Total","10:00 AM","12:00 PM","1:00 PM","1:30 PM"]]
 
 // 🔥 CATEGORY LIST
 const categories = ["SQ","BALL","CR","RH","HEART","4COM","3COM","MAT","GLOVES"]
@@ -595,7 +595,7 @@ categoryCount[cat] += value   // ❌ no Math.round
 categories.forEach((cat,i)=>{
 if(!data[i+1]) data[i+1] = []
 data[i+1][9] = cat
-data[i+1][10] = categoryCount[cat]
+data[i+1][11] = categoryCount[cat]
 })
 
 // 🔥 EXPORT
