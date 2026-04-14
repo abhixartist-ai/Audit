@@ -600,6 +600,123 @@ data[i+1][11] = categoryCount[cat]
 
 // 🔥 EXPORT
 let ws = XLSX.utils.aoa_to_sheet(data)
+// ===============================
+// 🔥 EXCEL FORMATTING START
+// ===============================
+
+// 📏 Row height (Row 1 = 30)
+ws["!rows"] = [{ hpt: 30 }]
+
+// 📌 helper for cell existence
+function cell(r, c){
+  return XLSX.utils.encode_cell({r:r, c:c})
+}
+
+// 🎨 STYLE FUNCTION (apply if supported by sheetjs build)
+function styleCell(address, style){
+  if(!ws[address]) ws[address] = { v: "" }
+  ws[address].s = style
+}
+
+// ===============================
+// 🔥 HEADER STYLING (A1:O1)
+// ===============================
+for(let c=0; c<=14; c++){
+  let addr = cell(0,c)
+
+  styleCell(addr,{
+    font:{bold:true,color:{rgb:"FFFFFF"}},
+    alignment:{horizontal:"center",vertical:"center"}
+  })
+}
+
+// ===============================
+// 🎨 FILL COLORS
+// ===============================
+function fill(addr,color){
+  styleCell(addr,{
+    fill:{
+      patternType:"solid",
+      fgColor:{rgb:color}
+    }
+  })
+}
+
+// A1:I1 grey
+for(let c=0;c<=8;c++) fill(cell(0,c),"D3D3D3")
+
+// J1:K1 dark grey
+fill(cell(0,9),"808080")
+fill(cell(0,10),"808080")
+
+// L1:O1 light grey
+for(let c=11;c<=14;c++) fill(cell(0,c),"E6E6E6")
+
+// ===============================
+// 📌 FORMULAS (K2:K10)
+// ===============================
+for(let r=1;r<=9;r++){
+  let row = r+1
+  ws[cell(r,10)] = {
+    f:`SUM(L${row}:O${row})`
+  }
+}
+
+// ===============================
+// 📌 K11 TOTAL
+// ===============================
+ws[cell(10,10)] = {
+  f:`SUM(K2:K10)`
+}
+fill(cell(10,10),"FFFF00")
+
+// ===============================
+// 🔥 BOLD K COLUMN (K2:K11)
+// ===============================
+for(let r=1;r<=10;r++){
+  let addr = cell(r,10)
+  styleCell(addr,{
+    font:{bold:true}
+  })
+}
+
+// ===============================
+// 📌 BORDERS FUNCTION
+// ===============================
+function borderAll(addr){
+  styleCell(addr,{
+    border:{
+      top:{style:"thin"},
+      bottom:{style:"thin"},
+      left:{style:"thin"},
+      right:{style:"thin"}
+    }
+  })
+}
+
+// ===============================
+// 📏 BORDER 1: A1 → last data row (A:O horizontal + vertical grid)
+// ===============================
+let lastRow = data.length
+
+for(let r=0;r<lastRow;r++){
+  for(let c=0;c<=14;c++){
+    borderAll(cell(r,c))
+  }
+}
+
+// ===============================
+// 📏 BORDER 2: J1 → O10 block separately
+// ===============================
+for(let r=0;r<=9;r++){
+  for(let c=9;c<=14;c++){
+    borderAll(cell(r,c))
+  }
+}
+
+// ===============================
+// 🔥 EXCEL FORMATTING END
+// ===============================
 let wb = XLSX.utils.book_new()
 XLSX.utils.book_append_sheet(wb, ws, "Summary")
 
