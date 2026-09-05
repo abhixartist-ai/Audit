@@ -1051,10 +1051,6 @@ async function processPDF(){
 
 }
 
-let win=window.open(URL.createObjectURL(new Blob([await newPdf.save()],{type:"application/pdf"})))
-setTimeout(()=>{win.print()},500)
-window.onfocus=function(){hideLoader();window.onfocus=null}
-}
 
 /* FLIPKART */
 async function processFlipkart(){
