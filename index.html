@@ -241,6 +241,7 @@ animation:spin 1s linear infinite;
 
   <button class="btn" onclick="processPDF()">Print Amazon Labels</button>
   <button class="btn" onclick="processFlipkart()">Print Flipkart Labels</button>
+  <button class="btn" onclick="processMeesho()">Print Meesho Labels</button>
   <button class="btn" onclick="downloadSummary()">Download Summary Excel</button>
 
 </div>
@@ -644,15 +645,29 @@ async function processPDF(){
                 /* -------------------------------------
                    SKU EXTRACTION
 
+                   NEW LOGIC:
+
+                   SKU is the value inside brackets
+                   immediately BEFORE HSN:
+
                    Example:
-                   ( Q2-HNH7-FUQ7 )
-                   ( NH-5VZC-DXW7 )
-                   ( PINK-CR-01 )
+
+                   B0H99FQHBZ ( BLACK-SQ-02 )
+                   HSN:3924
+
+                   SKU = BLACK-SQ-02
+
+                   Another example:
+
+                   B0H94LJ1HK ( SN-8OPT-KXUK )
+                   HSN:3924
+
+                   SKU = SN-8OPT-KXUK
                 ------------------------------------- */
 
                 let sku = [
                     ...invText.matchAll(
-                        /\(\s*([A-Z0-9]+(?:-[A-Z0-9]+)+)\s*\)/g
+                        /\(\s*([^()]+?)\s*\)\s*HSN\s*:/gi
                     )
                 ];
 
@@ -1074,18 +1089,76 @@ setTimeout(()=>{win.print()},500)
 window.onfocus=function(){hideLoader();window.onfocus=null}
 }
 
+/* MEESHO */
+async function processMeesho(){
+
+if(!pdfBuffer){
+alert("Upload PDF first");
+return;
+}
+
+showLoader();
+
+const pdf=await pdfjsLib.getDocument({data:pdfBuffer}).promise;
+
+const newPdf=await PDFLib.PDFDocument.create();
+
+const originalPdf=await PDFLib.PDFDocument.load(pdfBuffer);
+
+for(let i=0;i<pdf.numPages;i++){
+
+const [p]=await newPdf.copyPages(originalPdf,[i]);
+
+const {width,height}=p.getSize();
+
+/*
+Keep full width
+Remove only bottom 489 pt
+*/
+
+p.setCropBox(
+0,
+489,
+width,
+height-489
+);
+
+newPdf.addPage(p);
+
+}
+
+let win=window.open(
+URL.createObjectURL(
+new Blob(
+[await newPdf.save()],
+{type:"application/pdf"}
+)
+)
+);
+
+setTimeout(()=>{
+win.print();
+},500);
+
+window.onfocus=function(){
+hideLoader();
+window.onfocus=null;
+}
+
+}
+
 /* EXCEL */
 function downloadSummary(){
 
 let data = [["Order No","Order Date","Order ID","S.No","SKU","Replacement","Qty","Total PCS","Item Total","Category","Total","10:00 am","12:00 pm","1:00 pm","1:30 pm"]]
 
 // 🔥 CATEGORY LIST
-const categories = ["SQ","BALL","CR","RH","HEART","4COM","3COM","MAT","GLOVES"]
+const categories = ["SQ","BALL","CR","RH","HEART","4COM","3COM","MAT","GLOVES","LID","POPIT","TEETHER"]
 
 // 🔥 COUNT OBJECT
 let categoryCount = {
 SQ:0, BALL:0, CR:0, RH:0, HEART:0,
-"4COM":0, "3COM":0, MAT:0, GLOVES:0
+"4COM":0, "3COM":0, MAT:0, GLOVES:0, LID:0, POPIT:0, TEETHER:0
 }
 
 // 🔥 NORMAL DATA
@@ -1129,6 +1202,29 @@ let totalPieces = match ? parseInt(match[1]) : 1
 // 👉 detect categories with weight
 let found = {}
 
+// TEETHER special
+if(
+    rep.includes("HAND") ||
+    rep.includes("ELI") ||
+    rep.includes("DOG")
+){
+    found["TEETHER"] = 1
+}
+
+// LID special
+if(rep.includes("LID")){
+    found["LID"] = 1
+}
+
+// POPIT special
+if(
+    rep.includes("TEDDY") ||
+    rep.includes("TOY") ||
+    rep.includes("UNICORN") ||
+    rep.includes("MAP")
+){
+    found["POPIT"] = 1
+}
 // BALL special
 if(rep.includes("BALL") || rep.includes("FBALL") || rep.includes("BBALL")){
 found["BALL"] = 1
